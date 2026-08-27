@@ -1,0 +1,180 @@
+/* ---------- task create/edit form — LEFT side drawer (v2.6) ---------- */
+function taskModal(_e,status){taskForm(null,status);}
+function taskEdit(id){taskForm(id);}
+function taskForm(id,status){
+  asgDdClose();
+  const t=id?task(id):null;
+  if(t&&!can('tasks','e')){toast('err','دسترسی لازم را ندارید','ویرایش تسک برای حساب شما مجاز نیست.');return;}
+  ASG_NEW=t?t.assignees.slice():['e1'];
+  S._tf={id:t?t.id:null,st:status||(t?t.status:'todo'),
+    ws:t&&t.project?(prj(t.project).ws||''):'',
+    labels:t?t.labels.slice():[],
+    ck:t?t.checklist.map(c=>({id:c.id,taskId:c.taskId,title:c.title,completed:c.completed,order:c.order,createdAt:c.createdAt,updatedAt:c.updatedAt})):[]};
+  openDrawer({title:t?'ویرایش تسک':'ایجاد تسک',
+    sub:t?'ویرایش کامل اطلاعات تسک — تغییرات با «ذخیره تغییرات» اعمال می‌شود.':'تسک جدید برای پروژه یا فضای کاری ایجاد کنید.',
+    icon:'tasks',cls:'dw-tf',
+    body:taskFormHtml(t),
+    footer:`<button class="btn btn-ghost" onclick="closeDrawer()">لغو</button>
+      <button class="btn btn-pr" onclick="taskSave()">${ic('check',14)} ${t?'ذخیره تغییرات':'ایجاد تسک'}</button>`});
+  setTimeout(()=>{const i=$('#tk-t');if(i)i.focus();},60);
+}
+function tfPrjOpts(sel){
+  const ws=S._tf.ws;const list=ws?PRJ.filter(p=>p.ws===ws):PRJ;
+  return `<option value="">بدون پروژه</option>`+list.map(p=>`<option value="${p.id}" ${p.id===sel?'selected':''}>${p.name}</option>`).join('');
+}
+function taskFormHtml(t){
+  const f=S._tf;
+  return `
+  <div class="tf-h">${ic('info',13)} اطلاعات پایه</div>
+  ${fld('عنوان تسک',`<input class="inp" id="tk-t" placeholder="مثلاً: بازبینی سناریوی تیزر" value="${t?esc(t.title):''}">`)}
+  <div class="mt12">${fld('توضیحات',`<textarea class="txa" id="tk-d" placeholder="جزئیات، معیارهای پذیرش و منابع مورد نیاز…">${t?esc(t.desc):''}</textarea>`)}</div>
+  <div class="tf-h">${ic('briefcase',13)} فضای کاری و پروژه</div>
+  <div class="frow">
+   ${fld('فضای کاری',selWrap('tk-ws',[{v:'',t:'همه فضاهای کاری'}].concat(WS.map(w=>({v:w.id,t:w.name}))),f.ws,'onchange="tfWs(this.value)"'))}
+   ${fld('پروژه',`<div class="sel-wrap" id="tk-p-wrap"><select class="sel" id="tk-p">${tfPrjOpts(t?t.project:null)}</select>${ic('chevdown',14)}</div>`)}
+  </div>
+  <div class="tf-h">${ic('users',13)} مسئولین</div>
+  ${fld('مسئولین تسک',asgFieldHtml())}
+  <div class="tf-h">${ic('flag',13)} وضعیت و اولویت</div>
+  <div class="frow">
+   ${fld('وضعیت',selWrap('tk-st',ST_COLS.map(c=>({v:c.id,t:c.t})),f.st))}
+   ${fld('اولویت',selWrap('tk-pr',PRIOS.map(p=>({v:p.id,t:p.t}))),t?t.prio:'mid'))}
+  </div>
+  <div class="tf-h">${ic('cal',13)} تاریخ‌ها</div>
+  <div class="frow">
+   ${dpField('tk-start','تاریخ شروع',t?t.start:null)}
+   ${dpField('tk-due','مهلت انجام',t?t.due:'')}
+  </div>
+  <div class="frow mt12">
+   ${fld('زمان تخمینی (ساعت)',`<input class="inp num" id="tk-est" inputmode="numeric" value="${t?fa(t.est):'۴'}" oninput="this.value=fa(this.value.replace(/[^0-9]/g,''))">`)}
+   ${fld('برچسب متنی (اختیاری)',`<input class="inp" id="tk-tags" placeholder="مثلاً: کمپین تابستان، بازبینی" value="${t?esc(t.tags.join('، ')):''}">`)}
+  </div>
+  <div class="tf-h">${ic('mytask',13)} چک‌لیست</div>
+  <div id="tf-ck">${tfCkHtml()}</div>
+  <div class="tf-h">${ic('tagi',13)} برچسب‌ها</div>
+  <div id="tf-lbs">${tfLbPicker()}</div>
+  <span class="hint">${ic('tagi',11)} برچسب رنگی با کلیک انتخاب یا لغو می‌شود؛ برچسب جدید را همین‌جا بسازید.</span>`;
+}
+function tfWs(v){
+  S._tf.ws=v;
+  const cur=$('#tk-p').value;
+  const keep=PRJ.some(p=>p.id===cur&&(v===''||p.ws===v));
+  $('#tk-p').innerHTML=tfPrjOpts(keep?cur:'');
+}
+function tfLbPicker(){
+  return `<div class="row g6 wrap">${LABELS.map(l=>`<button type="button" class="lb" style="background:${S._tf.labels.includes(l.id)?LB_SOFT[l.c]:'var(--s2)'};color:${LB_COLORS[l.c]};border:1px solid ${S._tf.labels.includes(l.id)?'transparent':'var(--bd)'};cursor:pointer" onclick="tfLbl('${l.id}')"><i style="background:${LB_COLORS[l.c]}"></i>${esc(l.n)}</button>`).join('')}<button type="button" class="lb-add" onclick="lblModal()">${ic('plus',11)} برچسب جدید</button></div>`;
+}
+function tfLbl(lid){const i=S._tf.labels.indexOf(lid);i>-1?S._tf.labels.splice(i,1):S._tf.labels.push(lid);const el=$('#tf-lbs');if(el)el.innerHTML=tfLbPicker();}
+/* ---------- checklist editor (inside form drawer) ---------- */
+function tfCkHtml(){
+  const ck=S._tf.ck;const done=ck.filter(c=>c.completed).length;
+  const pct=ck.length?Math.round(done/ck.length*100):0;
+  return `${ck.length?`<div class="row" style="justify-content:space-between"><span class="t-lbl">پیشرفت چک‌لیست</span><span class="t-cap num">${ic('check',11)} ${fa(done)} / ${fa(ck.length)} انجام شده · ${fa(pct)}٪</span></div><div class="prog mt8 mb8"><i style="width:${pct}%"></i></div>`:''}
+   <div id="tf-ck-list">${ck.map((c,i)=>tfCkRow(c,i)).join('')||'<span class="hint">زیرکارها و مراحل انجام را فهرست کنید؛ پیشرفت به‌صورت خودکار محاسبه می‌شود.</span>'}</div>
+   <button type="button" class="btn btn-sm btn-sec mt4" onclick="tfCkAdd()">${ic('plus',13)} افزودن مورد</button>`;
+}
+function tfCkRow(c,i){
+  return `<div class="ck-item ${c.completed?'done':''}">
+    <label class="ckb"><input type="checkbox" ${c.completed?'checked':''} onchange="tfCkTgl(${i})"><span class="bx">${ic('check',11)}</span></label>
+    <input class="inp ck-inp grow" id="cki-${i}" value="${esc(c.title)}" placeholder="مورد ${fa(i+1)} — مثلاً: آماده‌سازی سناریو" oninput="S._tf.ck[${i}].title=this.value" onkeydown="if(event.key==='Enter'){event.preventDefault();tfCkAdd(${i});}">
+    <span class="ord"><button type="button" data-tip="جابه‌جایی به بالا" onclick="tfCkMove(${i},-1)" ${i===0?'disabled style="opacity:.3"':''} style="transform:rotate(180deg)">${ic('chevdown',11)}</button><button type="button" data-tip="جابه‌جایی به پایین" onclick="tfCkMove(${i},1)" ${i===S._tf.ck.length-1?'disabled style="opacity:.3"':''}>${ic('chevdown',11)}</button></span>
+    <button type="button" class="ibtn ibtn-err" data-tip="حذف" onclick="tfCkDel(${i})">${ic('trash',13)}</button></div>`;
+}
+function tfCkRer(){const el=$('#tf-ck');if(el)el.innerHTML=tfCkHtml();}
+function tfCkAdd(after){const at=(after!=null?after+1:S._tf.ck.length);S._tf.ck.splice(at,0,{title:'',completed:false});tfCkRer();const el=$('#cki-'+at);if(el)el.focus();}
+function tfCkTgl(i){S._tf.ck[i].completed=!S._tf.ck[i].completed;tfCkRer();}
+function tfCkDel(i){S._tf.ck.splice(i,1);tfCkRer();}
+function tfCkMove(i,d){const j=i+d;if(j<0||j>=S._tf.ck.length)return;const a=S._tf.ck;[a[i],a[j]]=[a[j],a[i]];tfCkRer();}
+/* ---------- assignee searchable multi-select dropdown ---------- */
+let ASG_NEW=['e1'];
+let ASG_DD=null;
+function asgFieldHtml(){
+  return `<div class="asg-fld" id="asg-fld">
+    <div class="asg-box" id="asg-box" tabindex="0" role="combobox" aria-haspopup="listbox" aria-expanded="false" onclick="asgDdToggle()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();asgDdToggle();}">${asgChipsHtml()}
+      <button type="button" class="ibtn asg-clr" id="asg-clr" data-tip="حذف همه انتخاب‌ها" style="${ASG_NEW.length?'':'display:none'}" onclick="event.stopPropagation();asgClear()">${ic('x',13)}</button>
+      <span class="asg-chev">${ic('chevdown',14)}</span></div>
+    <span class="hint">${ic('users',11)} با کلیک روی فیلد، جستجو و انتخاب چند مسئول؛ تسک در «کارهای من» همه اعضا دیده می‌شود.</span></div>`;
+}
+function asgChipsHtml(){
+  return `<div class="row g6 wrap grow" id="tf-asg-chips">${ASG_NEW.map(id=>{const e=emp(id);return `<span class="chip chip-sel on">${av(e.name,'xs')} ${e.name}<button type="button" class="ibtn" style="width:20px;height:20px" aria-label="حذف ${e.name}" onclick="event.stopPropagation();asgRemove('${id}')">${ic('x',10)}</button></span>`;}).join('')||'<span class="asg-ph">انتخاب مسئولین تسک…</span>'}</div>`;
+}
+function tfAsgChips(){const c=$('#tf-asg-chips');if(c)c.outerHTML=asgChipsHtml();const cl=$('#asg-clr');if(cl)cl.style.display=ASG_NEW.length?'':'none';}
+function asgDdToggle(){ASG_DD?asgDdClose():asgDdOpen();}
+function asgDdOpen(){
+  asgDdClose();
+  const box=$('#asg-box');if(!box)return;
+  const el=document.createElement('div');el.className='asg-dd';el.id='asg-dd';
+  el.innerHTML=`<div class="asg-dd-q">${ic('search',13)}<input id="asg-q" placeholder="جستجوی همکار…" oninput="asgDdSearch(this.value)" onkeydown="asgDdKeys(event)"></div>
+    <div class="asg-dd-list" id="asg-dd-list" role="listbox"></div>
+    <div class="asg-dd-f"><button type="button" class="btn btn-sm btn-ghost" onclick="asgClear()">${ic('x',12)} پاک کردن انتخاب‌ها</button><span class="t-cap" id="asg-dd-cnt"></span></div>`;
+  document.body.appendChild(el);ASG_DD=el;
+  const r=box.getBoundingClientRect();
+  const w=Math.max(Math.round(r.width),250);
+  el.style.width=w+'px';
+  const h=Math.min(330,innerHeight-20);
+  el.style.maxHeight=h+'px';
+  let top=r.bottom+6;
+  if(top+Math.min(el.offsetHeight||h,h)>innerHeight-8)top=r.top-6-h;
+  el.style.top=Math.max(8,Math.min(top,innerHeight-80))+'px';
+  el.style.left=Math.max(8,Math.min(r.left,innerWidth-w-8))+'px';
+  box.classList.add('open');box.setAttribute('aria-expanded','true');
+  S._asgHl=0;asgDdSearch('');
+  setTimeout(()=>{const q=$('#asg-q');if(q){q.focus();q.select();}},30);
+  setTimeout(()=>{document.addEventListener('mousedown',asgDdOut);document.addEventListener('scroll',asgDdScrl,true);},0);
+}
+function asgDdClose(){
+  if(ASG_DD){ASG_DD.remove();ASG_DD=null;}
+  const b=$('#asg-box');if(b){b.classList.remove('open');b.setAttribute('aria-expanded','false');}
+  document.removeEventListener('mousedown',asgDdOut);document.removeEventListener('scroll',asgDdScrl,true);
+}
+function asgDdOut(e){if(ASG_DD&&!ASG_DD.contains(e.target)&&!(e.target.closest&&e.target.closest('#asg-box')))asgDdClose();}
+function asgDdScrl(){asgDdClose();}
+function asgDdSearch(q){
+  const list=$('#asg-dd-list');if(!list)return;
+  q=(q||'').trim();
+  const hits=EMP.filter(e=>!q||e.name.includes(q)||e.role.includes(q)||e.dept.includes(q));
+  S._asgHits=hits;
+  if(!hits.length||S._asgHl>=hits.length)S._asgHl=0;
+  list.innerHTML=hits.map((e,i)=>`<button type="button" class="asg-opt${ASG_NEW.includes(e.id)?' sel':''}${i===S._asgHl?' hl':''}" role="option" aria-selected="${ASG_NEW.includes(e.id)}" onclick="asgToggle('${e.id}')" onmousemove="asgHl(${i})">${av(e.name,'sm')}<span class="who"><b>${e.name}</b><span>${e.role} · ${e.dept}</span></span><span class="asg-bx">${ic('check',12)}</span></button>`).join('')||'<div class="asg-dd-empty">همکاری با این نام یافت نشد</div>';
+  const cnt=$('#asg-dd-cnt');if(cnt)cnt.textContent=fa(ASG_NEW.length)+' نفر انتخاب شده';
+  const hl=list.querySelector('.asg-opt.hl');if(hl)hl.scrollIntoView({block:'nearest'});
+}
+function asgHl(i){if(S._asgHl===i)return;S._asgHl=i;const list=$('#asg-dd-list');if(!list)return;const opts=list.querySelectorAll('.asg-opt');opts.forEach((x,xi)=>x.classList.toggle('hl',xi===i));}
+function asgDdKeys(e){
+  const hits=S._asgHits||[];
+  if(e.key==='Escape'){e.stopPropagation();asgDdClose();}
+  else if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();e.stopPropagation();if(!hits.length)return;S._asgHl=(S._asgHl+(e.key==='ArrowDown'?1:-1)+hits.length)%hits.length;asgDdSearch($('#asg-q').value);}
+  else if(e.key==='Enter'){e.preventDefault();e.stopPropagation();if(hits[S._asgHl])asgToggle(hits[S._asgHl].id);}
+}
+function asgToggle(id){const i=ASG_NEW.indexOf(id);i>-1?ASG_NEW.splice(i,1):ASG_NEW.push(id);if(ASG_DD)asgDdSearch($('#asg-q')?$('#asg-q').value:'');tfAsgChips();}
+function asgRemove(id){ASG_NEW=ASG_NEW.filter(x=>x!==id);if(ASG_DD)asgDdSearch($('#asg-q')?$('#asg-q').value:'');tfAsgChips();}
+function asgClear(){ASG_NEW=[];if(ASG_DD)asgDdSearch('');tfAsgChips();}
+/* ---------- save (create + edit) ---------- */
+function taskSave(){
+  const f=S._tf||{};
+  const title=($('#tk-t').value||'').trim();
+  if(!title){const el=$('#tk-t');el.classList.add('err');el.focus();return;}
+  const asg=ASG_NEW.length?ASG_NEW.slice():['e1'];
+  const st=$('#tk-st').value;
+  const data={title,desc:$('#tk-d').value,project:$('#tk-p').value||null,status:st,prio:$('#tk-pr').value,
+    assignee:asg[0],assignees:asg,
+    start:($('#tk-start').dataset&&$('#tk-start').dataset.val)||null,
+    due:($('#tk-due').dataset&&$('#tk-due').dataset.val)||'',
+    est:+enDigits($('#tk-est').value)||4,
+    tags:$('#tk-tags').value?$('#tk-tags').value.split(/[،,]/).map(x=>x.trim()).filter(Boolean):[],
+    labels:f.labels.slice(),
+    checklist:f.ck.filter(c=>(c.title||'').trim()).map((c,i)=>({id:c.id||uid('ck'),taskId:f.id||'',title:c.title.trim(),completed:!!c.completed,order:i,createdAt:c.createdAt||Date.now(),updatedAt:Date.now()}))};
+  asgDdClose();closeDrawer();
+  if(f.id){
+    const t=task(f.id);if(!t)return;
+    Object.assign(t,data);
+    t.checklist=data.checklist.map(c=>(c.taskId=t.id,c));
+    S._tf=null;render();
+    toast('ok','تسک به‌روزرسانی شد','تغییرات «'+title+'» ذخیره شد.');
+    return;
+  }
+  const id=uid('t');
+  TASKS.unshift(Object.assign({id,cm:0,att:0},data,{checklist:data.checklist.map(c=>(c.taskId=id,c))}));
+  S._tf=null;render();
+  toast('ok','تسک ایجاد شد','«'+title+'» به '+ST_COLS.find(c=>c.id===st).t+' افزوده شد');
+}
