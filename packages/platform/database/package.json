@@ -7,6 +7,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./migrations/202608280001-create-users": {
+      "types": "./dist/migrations/202608280001-create-users.d.ts",
+      "default": "./dist/migrations/202608280001-create-users.js"
     }
   },
   "scripts": {
@@ -15,6 +19,8 @@
     "test": "vitest run --config vitest.config.ts"
   },
   "dependencies": {
+    "@effect/users": "workspace:*",
+    "@nestjs/common": "^11.1.17",
     "pg": "^8.16.3",
     "reflect-metadata": "^0.2.2",
     "typeorm": "^0.3.28"

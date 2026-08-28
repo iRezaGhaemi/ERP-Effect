@@ -8,6 +8,7 @@ FROM base AS dependencies
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
 COPY apps/api/package.json apps/api/package.json
 COPY apps/web/package.json apps/web/package.json
+COPY packages/features/users/package.json packages/features/users/package.json
 COPY packages/platform/config/package.json packages/platform/config/package.json
 COPY packages/platform/database/package.json packages/platform/database/package.json
 COPY packages/platform/logger/package.json packages/platform/logger/package.json
