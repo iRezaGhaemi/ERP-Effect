@@ -1,11 +1,13 @@
 const {chromium}=require('playwright-core');
+const {APP_URL}=require('./paths');
+const {browserLaunchOptions}=require('./browser');
 const problems=[],ok=[];
 (async()=>{
-  const b=await chromium.launch({args:['--no-sandbox']});
+  const b=await chromium.launch(browserLaunchOptions({args:['--no-sandbox']}));
   const pg=await b.newPage({viewport:{width:1360,height:900}});
   pg.on('pageerror',e=>problems.push('PAGEERROR: '+e.message));
   pg.on('console',m=>{if(m.type()==='error')problems.push('CONSOLE: '+m.text());});
-  await pg.goto('file:///home/user/effect-erp.html');
+  await pg.goto(APP_URL);
   await pg.waitForTimeout(300);
   await pg.evaluate(()=>{S.authed=true;S.missionSeen=true;});
   const nav=async(r,tab)=>{await pg.evaluate(([rr,tb])=>{if(tb){if(rr.startsWith('cpro'))S.tabs.cp=tb;else if(rr.startsWith('team'))S.tabs.emp=tb;else if(rr.startsWith('customers'))S.tabs.cust=tb;else if(rr==='settings')S.setTab=tb;}location.hash='#/'+rr;render();},[r,tab]);await pg.waitForTimeout(200);};

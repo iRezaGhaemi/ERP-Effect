@@ -1,4 +1,12 @@
 {
+  "scripts": {
+    "build": "../build.sh",
+    "test": "npm run test:regressions && npm run test:smoke && npm run test:leak",
+    "test:regressions": "node --test build-portability.test.js ui-regressions.test.js",
+    "test:smoke": "node smoke.js",
+    "test:leak": "node leak.js",
+    "test:browser": "node tokens.js && node audit.js && node containment.js && node qa23.js && node qa24.js && node qa25.js && node qa26.js && node qa-final.js"
+  },
   "dependencies": {
     "jsdom": "^24.1.3",
     "playwright-core": "1.49"

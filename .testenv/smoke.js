@@ -1,6 +1,7 @@
 const fs=require('fs');
 const {JSDOM}=require('jsdom');
-const html=fs.readFileSync('/home/user/effect-erp.html','utf8');
+const {APP_PATH}=require('./paths');
+const html=fs.readFileSync(APP_PATH,'utf8');
 const errors=[];
 const dom=new JSDOM(html,{runScripts:'dangerously',pretendToBeVisual:true,url:'https://erp.local/',
   beforeParse(w){

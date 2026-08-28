@@ -92,7 +92,7 @@ function cpTabTasks(cp,ctasks){
      ${ts.map(t=>`<div class="kb-card" draggable="true" ondragstart="kbDrag(event,'${t.id}')" ondragend="this.classList.remove('dragging')" onclick="taskDrawer('${t.id}')" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="kbDrop(event,'${col.id}')">
       ${t.labels.length?`<div class="kb-lbs mb8">${t.labels.slice(0,3).map(l=>lbChip(l)).join('')}</div>`:''}
       <div class="meta">${prioBadge(t.prio)}</div>
-      <div class="tt">${t.title}</div>
+      <div class="tt">${esc(t.title)}</div>
       <div class="row g6 mb8 wrap">${dueBadge(t.due)}</div>
       ${t.checklist.length?`<div class="row g6 mb8"><div class="prog" style="flex:1;min-width:60px"><i style="width:${Math.round(ckDone(t)/t.checklist.length*100)}%"></i></div><span class="t-cap">${ic('check',11)} ${fa(ckDone(t))}/${fa(t.checklist.length)}</span></div>`:''}
       <div class="kb-f">

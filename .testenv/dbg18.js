@@ -1,9 +1,11 @@
 const {chromium}=require('playwright-core');
+const {APP_URL}=require('./paths');
+const {browserLaunchOptions}=require('./browser');
 (async()=>{
-  const b=await chromium.launch({args:['--no-sandbox']});
+  const b=await chromium.launch(browserLaunchOptions({args:['--no-sandbox']}));
   const pg=await b.newPage({viewport:{width:1360,height:900}});
   pg.on('pageerror',e=>console.log('PAGEERROR:',e.message));
-  await pg.goto('file:///home/user/effect-erp.html');await pg.waitForTimeout(300);
+  await pg.goto(APP_URL);await pg.waitForTimeout(300);
   await pg.evaluate(()=>{S.authed=true;S.missionSeen=true;location.hash='#/dashboard';render();});
   await pg.waitForTimeout(400);
   const r=await pg.evaluate(()=>{

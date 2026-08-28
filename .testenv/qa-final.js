@@ -1,14 +1,16 @@
 /* FINAL QA — ۱۸ بند چک‌لیست پایانی پرامپت v2.4 */
 const {chromium}=require('playwright-core');
+const {APP_URL}=require('./paths');
+const {browserLaunchOptions}=require('./browser');
 const R=[];const F=[];
 const ck=(id,pass,detail)=>{(pass?R:F).push((pass?'✓ ':'✗ ')+id+(detail?' — '+detail:''));};
 (async()=>{
-  const b=await chromium.launch({args:['--no-sandbox']});
+  const b=await chromium.launch(browserLaunchOptions({args:['--no-sandbox']}));
 
   /* ===== لاگین ===== */
   let pg=await b.newPage({viewport:{width:1440,height:900}});
   pg.on('pageerror',e=>F.push('✗ PAGEERROR '+e.message));
-  await pg.goto('file:///home/user/effect-erp.html');await pg.waitForTimeout(700);
+  await pg.goto(APP_URL);await pg.waitForTimeout(700);
   let v=await pg.evaluate(async()=>{
     await document.fonts.ready;
     const bg=document.querySelector('.auth-bg');
@@ -108,7 +110,7 @@ const ck=(id,pass,detail)=>{(pass?R:F).push((pass?'✓ ':'✗ ')+id+(detail?' �
 
   /* ===== overflow چند مسیر ===== */
   pg=await b.newPage({viewport:{width:390,height:844}});
-  await pg.goto('file:///home/user/effect-erp.html');await pg.waitForTimeout(300);
+  await pg.goto(APP_URL);await pg.waitForTimeout(300);
   await pg.evaluate(()=>{S.authed=true;S.missionSeen=true;});
   let ovf=0;
   for(const r of ['dashboard','tasks','crm','social/report','team/e2','cpro/cp1','finance/bank']){

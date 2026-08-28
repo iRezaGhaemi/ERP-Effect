@@ -1,6 +1,7 @@
-#!/bin/bash
-set -e
-cd /home/user
+#!/usr/bin/env bash
+set -euo pipefail
+PROJECT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+cd "$PROJECT_DIR"
 OUT=effect-erp.html
 cat src/00-head.html > $OUT
 cat src/01-base.css src/02-shell.css src/03-modules.css src/04-features.css >> $OUT

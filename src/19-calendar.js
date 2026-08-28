@@ -19,7 +19,7 @@ function calView(){
     const isT=ds==='1405/06/05';
     cells+=`<div class="cal-d ${isT?'today':''} ${((firstDow+d-1)%7)===6?'j':''}" onclick="calDay('${ds}')" role="button" tabindex="0">
       <span class="n">${fa(d)}</span>
-      ${evs.slice(0,3).map(e=>`<span class="ev ${e.cls}" onclick="event.stopPropagation();${e.fn==='—'?'':e.fn}">${e.ic?ic(e.ic,9):''}<span>${e.t}</span></span>`).join('')}
+      ${evs.slice(0,3).map(e=>`<span class="ev ${e.cls}" onclick="event.stopPropagation();${e.fn==='—'?'':e.fn}">${e.ic?ic(e.ic,9):''}<span>${esc(e.t)}</span></span>`).join('')}
       ${evs.length>3?`<span class="ev more">+${fa(evs.length-3)}</span>`:''}</div>`;
   }
   return `<div class="row g12 cal-wrap" style="align-items:flex-start">
@@ -58,7 +58,7 @@ function calSideHtml(ds){
   const evs=calEventsFor(ds);
   return `<div class="t-h4 mb8">${jDowFa(toJ(ds))} ${dFaL(ds)}</div>
   ${evs.length?evs.map(e=>`<div class="row g10" style="padding:8px 0;border-bottom:1px solid var(--bd)">
-    <span class="ev ${e.cls}" style="padding:4px 8px">${e.t}</span></div>`).join(''):`<div class="empty-mini">رویدادی در این روز نیست</div>`}
+    <span class="ev ${e.cls}" style="padding:4px 8px">${esc(e.t)}</span></div>`).join(''):`<div class="empty-mini">رویدادی در این روز نیست</div>`}
   <button class="btn btn-sec btn-sm btn-blk mt8" onclick="meetModal('${ds}')">${ic('plus',13)} افزودن رویداد</button>`;
 }
 function calWeek(){
@@ -68,14 +68,14 @@ function calWeek(){
     const evs=calEventsFor(ds);
     return `<div style="border-left:1px solid var(--bd);min-height:280px;padding:8px">
      <div class="tc mb8"><div class="t-cap">${FA_WD_S[i]}</div><b style="font-size:16px;${ds==='1405/06/05'?'color:var(--pr3)':''}">${fa(d.jd)}</b></div>
-     ${evs.map(e=>`<div class="ev ${e.cls}" style="margin-bottom:4px;padding:4px 8px" onclick="${e.fn==='—'?'':e.fn}"><span>${e.t}</span></div>`).join('')}</div>`;}).join('')}</div>`;
+     ${evs.map(e=>`<div class="ev ${e.cls}" style="margin-bottom:4px;padding:4px 8px" onclick="${e.fn==='—'?'':e.fn}"><span>${esc(e.t)}</span></div>`).join('')}</div>`;}).join('')}</div>`;
 }
 function calDayView(){
   const ds=S.calSel||'1405/06/05';const evs=calEventsFor(ds);
   return `<div style="padding:16px">
    <h3 class="t-h3 mb12">${jDowFa(toJ(ds))} ${dFaL(ds)}</h3>
    ${evs.length?evs.map(e=>`<div class="row g12" style="padding:12px;border:1px solid var(--bd);border-radius:10px;background:var(--s2);margin-bottom:8px">
-     <span class="ev ${e.cls}" style="padding:4px 12px">${e.t}</span>
+     <span class="ev ${e.cls}" style="padding:4px 12px">${esc(e.t)}</span>
      <span class="t-cap mr-auto">${e.dur||'تمام روز'}</span>
      ${e.fn!=='—'?`<button class="btn btn-sm btn-ghost" onclick="${e.fn}">جزئیات</button>`:''}</div>`).join(''):
    `<div class="empty-mini" style="padding:40px">رویدادی برای این روز ثبت نشده است.</div>`}</div>`;
@@ -88,8 +88,8 @@ function calList(){
   return `<div style="padding:8px 16px 16px">${all.slice(0,12).map(e=>`
    <div class="row g12" style="padding:12px 0;border-bottom:1px solid var(--bd);cursor:pointer" onclick="${e.fn}">
      <span style="width:110px" class="t-cap num">${dFa(e.d)}</span>
-     <span class="ev ${e.cls}" style="padding:4px 12px">${e.t}</span>
-     <span class="t-cap mr-auto ellip">${e.l}</span></div>`).join('')}</div>`;
+     <span class="ev ${e.cls}" style="padding:4px 12px">${esc(e.t)}</span>
+     <span class="t-cap mr-auto ellip">${esc(e.l)}</span></div>`).join('')}</div>`;
 }
 function meetInfo(id){
   const m=MEETS.find(x=>x.id===id);

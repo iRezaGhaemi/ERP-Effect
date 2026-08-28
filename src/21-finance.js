@@ -268,7 +268,7 @@ function payrollView(){
    <div class="kpi"><div class="k-l">${ic('clock',14)}در انتظار</div><div class="k-v num">${fa(rows.length-paid)}<span class="un">نفر</span></div><div class="k-d">${faMoney(rows.filter(r=>!r.paid).reduce((s,r)=>s+r.net,0),false)}</div></div></div>
   <div class="row mb12 wrap" style="justify-content:space-between">
    <div class="row g8 wrap"><span class="t-cap">تاریخ پرداخت: ${dFaL(PAYROLL.payDate)}</span></div>
-   <div class="row g8"><button class="btn btn-sec btn-sm" onclick="toast('info','خروجی بانکی','فایل پرداخت گروهی (سامانه بانکی) در نسخه متصل فعال است.')">${ic('download',13)} فایل پرداخت گروهی</button>
+   <div class="row g8 wrap"><button class="btn btn-sec btn-sm" onclick="toast('info','خروجی بانکی','فایل پرداخت گروهی (سامانه بانکی) در نسخه متصل فعال است.')">${ic('download',13)} فایل پرداخت گروهی</button>
    <button class="btn btn-pr btn-sm" onclick="payrollRun()">${ic('zap',13)} اجرای پرداخت ${fa(rows.length-paid)} نفر باقی‌مانده</button></div></div>
   ${tblInit('prl',[
    {k:'emp',l:'کارمند',mobFull:true,r:r=>`<span class="row g8">${av(emp(r.emp).name)}<div><b>${emp(r.emp).name}</b><div class="sub">${emp(r.emp).role}</div></div></span>`},

@@ -32,7 +32,7 @@ function phoneStep(){
    <button class="btn btn-pr btn-lg btn-blk mt16" id="btn-ph" onclick="authSend()">
      <span class="grow">${AUTH.loading?'در حال بررسی…':'ادامه'}</span>${AUTH.loading?'<span class="spin"></span>':ic('arrowleft',16)}</button>`,
    `<button class="btn btn-ghost btn-blk mt12" onclick="authDemo()">ورود سریع نسخه دمو</button>
-    <p class="t-cap tc mt12">نسخه ۲.۱ · Effect Studio — سیستم عامل کسب‌وکار</p>`);
+    <p class="t-cap tc mt12">نسخه ۲.۶ · Effect Studio — سیستم عامل کسب‌وکار</p>`);
 }
 function otpStep(){
   return authShell(`

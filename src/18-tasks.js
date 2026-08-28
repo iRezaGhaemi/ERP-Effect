@@ -24,7 +24,7 @@ function taskFiltersBar(){
   const f=S.taskFilters;
   return filterbar(`
    <span class="lb">${ic('filter',13)} فیلترها</span>
-   <div class="inp-ic" style="width:210px"><input class="inp" style="height:32px;padding-left:32px" placeholder="جستجوی تسک…" value="${f.q}" oninput="S.taskFilters.q=this.value;debRender()"></div>
+   <div class="inp-ic" style="width:210px"><input class="inp" style="height:32px;padding-left:32px" placeholder="جستجوی تسک…" value="${esc(f.q)}" oninput="S.taskFilters.q=this.value;debRender()"></div>
    <div class="sel-wrap"><select class="sel fsel" onchange="S.taskFilters.proj=this.value;render()">
      <option value="">همه پروژه‌ها</option>${PRJ.map(p=>`<option ${f.proj===p.id?'selected':''} value="${p.id}">${p.name}</option>`).join('')}</select>${ic('chevdown',13)}</div>
    <div class="sel-wrap"><select class="sel fsel" onchange="S.taskFilters.asgn=this.value;render()">
@@ -50,7 +50,7 @@ function myTasksView(){
     <div class="kpi"><div class="k-l">${ic('alert',15)}عقب‌افتاده</div><div class="k-v num">${fa(now.filter(t=>dueCls(t.due)==='over').length)}</div><div class="k-d dn">${ic('trenddn',12)}نیاز به پیگیری فوری</div></div>
   </div>
   ${tblInit('myt',[
-    {k:'title',l:'عنوان',r:t=>`<b>${t.title}</b>${t.tags.length?`<div class="sub">${t.tags.map(x=>`<span class="tag">${x}</span>`).join(' ')}</div>`:''}`,mobFull:true},
+    {k:'title',l:'عنوان',r:t=>`<b>${esc(t.title)}</b>${t.tags.length?`<div class="sub">${t.tags.map(x=>`<span class="tag">${esc(x)}</span>`).join(' ')}</div>`:''}`,mobFull:true},
     {k:'project',l:'پروژه',hideMob:true,r:t=>`<span class="t2c">${prj(t.project).name}</span>`},
     {k:'status',l:'وضعیت',r:t=>ST_COLS.find(c=>c.id===t.status)?`<span class="badge bd-${t.status==='done'?'ok':t.status==='doing'?'pr':t.status==='review'?'info':'mut'}">${ST_COLS.find(c=>c.id===t.status).t}</span>`:'—'},
     {k:'prio',l:'اولویت',r:t=>prioBadge(t.prio)},
@@ -86,7 +86,7 @@ function kanbanHtml(tasks){
         <div class="kb-card" draggable="true" ondragstart="kbDrag(event,'${t.id}')" ondragend="this.classList.add('dragging')" onclick="taskDrawer('${t.id}')">
           ${t.labels.length?`<div class="kb-lbs mb8">${t.labels.slice(0,3).map(l=>lbChip(l)).join('')}</div>`:''}
           <div class="meta">${prioBadge(t.prio)}</div>
-          <div class="tt">${t.title}</div>
+          <div class="tt">${esc(t.title)}</div>
           <div class="row g6 mb8" style="flex-wrap:wrap">${dueBadge(t.due)}<span class="badge bd-mut" style="font-size:10px">${prj(t.project).name}</span></div>
           ${t.checklist.length?`<div class="row g6 mb8"><div class="prog" style="flex:1;min-width:60px"><i style="width:${Math.round(ckDone(t)/t.checklist.length*100)}%"></i></div><span class="t-cap">${ic('check',11)} ${fa(ckDone(t))}/${fa(t.checklist.length)}</span></div>`:''}
           <div class="kb-f">
@@ -105,7 +105,7 @@ function kbDrop(e,col){e.preventDefault();$$('.kb-col').forEach(c=>c.classList.r
   toast('ok','تسک جابه‌جا شد','«'+t.title+'» ← '+ST_COLS.find(c=>c.id===col).t,{t:'واگرد',fn:`task('${id}').status='${old}';render()`});}
 function tasksListHtml(tasks){
   return tblInit('tsk',[
-    {k:'title',l:'عنوان',mobFull:true,r:t=>`<b>${t.title}</b>${t.labels.length?`<div class="kb-lbs mt4">${t.labels.slice(0,3).map(l=>lbChip(l)).join('')}</div>`:''}`},
+    {k:'title',l:'عنوان',mobFull:true,r:t=>`<b>${esc(t.title)}</b>${t.labels.length?`<div class="kb-lbs mt4">${t.labels.slice(0,3).map(l=>lbChip(l)).join('')}</div>`:''}`},
     {k:'assignee',l:'مسئولین',r:t=>`<span class="row g6">${avStack(t.assignees.map(a=>emp(a).name),3)}<span class="t2c ellip">${t.assignees.map(a=>emp(a).name.split(' ')[0]).join('، ')}</span></span>`},
     {k:'project',l:'پروژه',hideMob:true,r:t=>`<span class="t2c">${prj(t.project).name}</span>`},
     {k:'status',l:'وضعیت',r:t=>`<span class="badge bd-${t.status==='done'?'ok':t.status==='doing'?'pr':t.status==='review'?'info':'mut'}">${ST_COLS.find(c=>c.id===t.status).t}</span>`},
@@ -124,7 +124,7 @@ function tasksCalHtml(tasks){
     const dayTasks=tasks.filter(t=>t.due===ds);
     const isT=d===TODAY.jd&&m===TODAY.jm;
     cells+=`<div class="cal-d ${isT?'today':''}" onclick="daySheet('${ds}')"><span class="n">${fa(d)}</span>
-      ${dayTasks.slice(0,3).map(t=>`<span class="ev task" onclick="event.stopPropagation();taskDrawer('${t.id}')">${ic('check',9)} ${t.title}</span>`).join('')}
+      ${dayTasks.slice(0,3).map(t=>`<span class="ev task" onclick="event.stopPropagation();taskDrawer('${t.id}')">${ic('check',9)} ${esc(t.title)}</span>`).join('')}
       ${dayTasks.length>3?`<span class="ev more">+${fa(dayTasks.length-3)} مورد</span>`:''}</div>`;
   }
   return `<div class="cal"><div class="cal-g">${FA_WD_S.map((w,i)=>`<span class="cal-wh ${i===6?'j':''}">${w}</span>`).join('')}</div>
@@ -136,7 +136,7 @@ function daySheet(ds){
   const dayMeets=MEETS.filter(m2=>m2.date===ds);
   openDrawer({title:jStrL(toJ(ds)),sub:'رویدادهای این روز',icon:'cal',body:
     (dayMeets.length?`<h4 class="t-h4 mb8">جلسات</h4>`+dayMeets.map(m2=>`<div class="meet-mini mb8"><div class="tm"><b>${fa(m2.from)}</b></div><div class="bd grow"><b>${m2.t}</b><p>${m2.who.map(w=>emp(w).name).join('، ')}</p></div></div>`).join(''):'')+
-    (dayTasks.length?`<h4 class="t-h4 mb8 mt8">سررسید تسک‌ها</h4>`+dayTasks.map(t=>`<div class="appr" style="cursor:pointer" onclick="closeDrawer();taskDrawer('${t.id}')">${av(emp(t.assignee).name,'sm')}<div class="bd grow"><b>${t.title}</b><span>${prj(t.project).name}</span></div>${prioBadge(t.prio)}</div>`).join(''):
+    (dayTasks.length?`<h4 class="t-h4 mb8 mt8">سررسید تسک‌ها</h4>`+dayTasks.map(t=>`<div class="appr" style="cursor:pointer" onclick="closeDrawer();taskDrawer('${t.id}')">${av(emp(t.assignee).name,'sm')}<div class="bd grow"><b>${esc(t.title)}</b><span>${prj(t.project).name}</span></div>${prioBadge(t.prio)}</div>`).join(''):
     `<div class="empty-mini">تسکی با سررسید این روز نیست</div>`)});
 }
 function tasksTlHtml(tasks){
@@ -151,7 +151,7 @@ function tasksTlHtml(tasks){
       const sd=Math.max(1,s.jm===m?s.jd:1),ed=Math.min(len,e.jm===m?e.jd:len);
       const w=Math.max(3,((ed-sd+1)/len)*100),right=((sd-1)/len)*100;
       const cls=t.status==='done'?'done':dueCls(t.due)==='over'?'over':'';
-      return `<div class="tl-row"><div class="lb">${prioBadge(t.prio)}<span class="ellip t-bs" style="color:var(--t1);font-weight:600">${t.title}</span></div>
+      return `<div class="tl-row"><div class="lb">${prioBadge(t.prio)}<span class="ellip t-bs" style="color:var(--t1);font-weight:600">${esc(t.title)}</span></div>
         <div class="tl-track">${monthDays.filter(d=>d===1||d%7===0).map(()=>'<div class="tick"></div>').join('')}
           <div class="tl-today" style="right:${((TODAY.jd-1)/len)*100}%"></div>
           <div class="tl-bar ${cls}" style="right:${right}%;width:${w}%">${emp(t.assignee).name.split(' ')[0]}</div></div></div>`;}).join('')}
@@ -160,11 +160,14 @@ function tasksTlHtml(tasks){
 /* ---------- task detail drawer ---------- */
 function taskDrawer(id){
   const t=task(id);if(!t)return;
+  const comments=[...(t.comments||[])].reverse().map(c=>[emp(c.who).name,c.at,c.text]).concat([
+    ['الهام رستمی','۲ ساعت پیش','@رضا فایل نهایی رو تو گوگل درایو گذاشتم، لطفاً قبل از جلسه چک کن.'],
+    ['سارا احمدی','دیروز','پیشنهاد می‌کنم نسخه دوم سناریو رو هم بررسی کنیم؛ نرخ کلیک بهتری داشت.']]);
   openDrawer({title:t.title,sub:prj(t.project).name+' · '+t.id.toUpperCase(),icon:'tasks',wide:true,body:`
    <div class="row g8 wrap mb16">${prioBadge(t.prio)}
      <span class="badge bd-${t.status==='done'?'ok':t.status==='doing'?'pr':t.status==='review'?'info':'mut'}">${ST_COLS.find(c=>c.id===t.status).t}</span>
      ${dueBadge(t.due)}<span class="chip">${ic('timer',12)} ${fa(t.est)} ساعت تخمینی</span></div>
-   <p class="t-bs" style="color:var(--t1);line-height:1.9">${t.desc}</p>
+   <p class="t-bs" style="color:var(--t1);line-height:1.9">${esc(t.desc)}</p>
    <div class="grid grid-2 mt16" style="gap:12px">
     <div class="panel" style="padding:12px"><span class="t-lbl">مسئولین (${fa(t.assignees.length)})</span><div class="row g8 mt4 wrap">${avStack(t.assignees.map(a=>emp(a).name),4)}${t.assignees.length>4?`<span class="t-cap">+${fa(t.assignees.length-4)}</span>`:''}</div><div class="row g6 mt8 wrap">${t.assignees.map(a=>`<span class="tag">${emp(a).name}</span>`).join('')}</div></div>
     <div class="panel" style="padding:12px"><span class="t-lbl">همکاران</span><div class="row g8 mt4">${avStack([emp(t.assignee).name,'سارا احمدی','الهام رستمی'])}<span class="t-cap">+۲</span></div></div>
@@ -173,7 +176,7 @@ function taskDrawer(id){
    </div>
    <h4 class="t-h4 mt20 mb8">برچسب‌ها</h4>
    ${lbPicker(t.labels,t.id)}
-   <div class="row g6 mt8">${t.tags.map(x=>`<span class="tag">${x}</span>`).join('')}</div>
+   <div class="row g6 mt8">${t.tags.map(x=>`<span class="tag">${esc(x)}</span>`).join('')}</div>
    ${ckBlock(t,can('tasks','e'))}
    <h4 class="t-h4 mt20 mb8">وابستگی‌ها</h4>
    <div class="panel" style="padding:12px 12px" class="row"><span class="t-cap">این تسک به‌صورت خودکار پس از تکمیل «تایید بودجه» آغاز می‌شود (وابستگی پایان ← شروع).</span></div>
@@ -181,9 +184,9 @@ function taskDrawer(id){
    <div class="row g8 wrap">${[...Array(Math.max(1,t.att))].map((_,i)=>`<span class="chip">${ic('paperclip',12)} فایل-${fa(i+1)}.zip</span>`).join('')}
      <button class="chip" onclick="toast('info','بارگذاری فایل','در نسخه متصل به Google Drive فعال است.')">${ic('plus',12)} افزودن</button></div>
    <h4 class="t-h4 mt20 mb8">کامنت‌ها (${fa(t.cm)})</h4>
-   ${[['الهام رستمی','۲ ساعت پیش','@رضا فایل نهایی رو تو گوگل درایو گذاشتم، لطفاً قبل از جلسه چک کن.'],['سارا احمدی','دیروز','پیشنهاد می‌کنم نسخه دوم سناریو رو هم بررسی کنیم؛ نرخ کلیک بهتری داشت.']].map(c=>`
-     <div class="row b g10 mb12">${av(c[0],'sm')}<div class="grow"><div class="row g6"><b class="t-bs" style="color:var(--t1)">${c[0]}</b><span class="t-cap">${c[1]}</span></div>
-     <p class="t-bs mt4">${c[2]}</p></div></div>`).join('')}
+   ${comments.map(c=>`
+     <div class="row b g10 mb12">${av(c[0],'sm')}<div class="grow"><div class="row g6"><b class="t-bs" style="color:var(--t1)">${esc(c[0])}</b><span class="t-cap">${esc(c[1])}</span></div>
+     <p class="t-bs mt4">${esc(c[2])}</p></div></div>`).join('')}
    <div class="row g8"><input class="inp grow" id="cmt-in" placeholder="کامنت بنویسید… (@منشن)"><button class="btn btn-pr" onclick="addCmt('${id}')">${ic('send',14)}</button></div>
    <h4 class="t-h4 mt20 mb8">فعالیت‌ها</h4>
    ${[['سارا احمدی','وضعیت ← در انتظار بررسی','۳ ساعت پیش'],[emp(t.assignee).name,'تسک ایجاد کرد','۲ روز پیش'],['سارا احمدی','چک‌لیست افزود','۲ روز پیش']].map(a=>`
@@ -194,6 +197,15 @@ function taskDrawer(id){
    <button class="btn btn-ghost" onclick="taskShare('${t.id}')">${ic('msg',14)} ارسال در پیام‌رسان</button>
    <button class="btn btn-ghost mr-auto" onclick="toast('info','لینک کپی شد','effectstudio.ir/erp/t/${t.id}')">${ic('link',14)} کپی لینک</button>
    ${can('tasks','d')?`<button class="ibtn ibtn-err" data-tip="حذف" onclick="confirmDlg('حذف تسک','از حذف این تسک مطمئن هستید؟ این عمل قابل بازگشت نیست.',()=>{TASKS.splice(TASKS.findIndex(x=>x.id==='${t.id}'),1);closeDrawer();render();toast('ok','تسک حذف شد')},'حذف تسک',true)">${ic('trash',15)}</button>`:''}`});
+}
+function addCmt(id){
+  const t=task(id),el=$('#cmt-in');if(!t||!el)return;
+  const text=el.value.trim();if(!text){el.focus();return;}
+  if(!Array.isArray(t.comments))t.comments=[];
+  t.comments.push({id:uid('cm'),who:'e1',at:'همین حالا',text});
+  t.cm=(t.cm||0)+1;
+  taskDrawer(id);
+  toast('ok','کامنت ثبت شد','پیام شما به تسک اضافه شد.');
 }
 function tglTaskLbl(tid,lid){
   if(tid==='_new'){S._newLbls=S._newLbls||[];const i=S._newLbls.indexOf(lid);i>-1?S._newLbls.splice(i,1):S._newLbls.push(lid);const el=document.getElementById('tk-lbs');if(el)el.innerHTML=lbPicker(S._newLbls,'_new');return;}
@@ -389,7 +401,7 @@ function projInfo(id){const p=prj(id);
    <h4 class="t-h4 mt16 mb8">پیشرفت (${fa(p.progress)}٪)</h4><div class="prog"><i style="width:${p.progress}%"></i></div>
    <h4 class="t-h4 mt16 mb8">تسک‌های مرتبط</h4>
    ${TASKS.filter(t=>t.project===id).slice(0,6).map(t=>`<div class="appr" style="cursor:pointer" onclick="closeDrawer();taskDrawer('${t.id}')">
-     <div class="bd grow"><b>${t.title}</b><span>${emp(t.assignee).name}</span></div>${prioBadge(t.prio)}</div>`).join('')||'<div class="empty-mini">تسکی ثبت نشده</div>'}`,
+     <div class="bd grow"><b>${esc(t.title)}</b><span>${emp(t.assignee).name}</span></div>${prioBadge(t.prio)}</div>`).join('')||'<div class="empty-mini">تسکی ثبت نشده</div>'}`,
   footer:`<button class="btn btn-pr" onclick="closeDrawer();taskModal(null)">تسک جدید در پروژه</button><button class="btn btn-ghost" onclick="closeDrawer()">بستن</button>`});}
 /* ---------- workspaces ---------- */
 function wsView(){
@@ -425,7 +437,7 @@ function wsView(){
     :tab==='members'?`<div class="grid grid-3">${ws.members.map(m=>{const e=emp(m);return `
        <div class="panel" style="padding:16px"><div class="row g10">${av(e.name,'lg')}<div class="grow"><b class="t-h4">${e.name}</b><p class="t-cap">${e.role} · ${e.dept}</p></div></div>
        <div class="loadbar mt8"><span class="nm">بار کاری</span><div class="prog ${e.load>85?'warn':''}"><i style="width:${e.load}%"></i></div><span class="pc">${fa(e.load)}٪</span></div></div>`;}).join('')}</div>`
-    :tab==='tasks'?tblInit('wst',[{k:'title',l:'تسک',mobFull:true,r:t=>`<b>${t.title}</b>`},{k:'assignee',l:'مسئولین',r:t=>`<span class="row g6">${avStack(t.assignees.map(a=>emp(a).name),3)}<span class="t2c ellip">${t.assignees.map(a=>emp(a).name.split(' ')[0]).join('، ')}</span></span>`},
+    :tab==='tasks'?tblInit('wst',[{k:'title',l:'تسک',mobFull:true,r:t=>`<b>${esc(t.title)}</b>`},{k:'assignee',l:'مسئولین',r:t=>`<span class="row g6">${avStack(t.assignees.map(a=>emp(a).name),3)}<span class="t2c ellip">${t.assignees.map(a=>emp(a).name.split(' ')[0]).join('، ')}</span></span>`},
        {k:'status',l:'وضعیت',r:t=>`<span class="badge bd-mut">${ST_COLS.find(c=>c.id===t.status).t}</span>`},{k:'due',l:'سررسید',r:dueBadge}],wtasks,{onRow:'taskDrawer',per:7})
     :ACTIVITY.slice(0,6).map(a=>`<div class="act-row"><span class="act-ic pr">${ic('activity',14)}</span><div class="grow"><p class="t-bs"><b>${emp(a.who).name}</b> — ${a.act} · <span class="t2c">${a.det}</span></p><time class="t-cap">${relTime(a.min)}</time></div></div>`).join('')}
     </div></div></div>`;

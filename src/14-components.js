@@ -26,8 +26,8 @@ function renderToasts(){
     const icn=t.type==='ok'?'check':t.type==='err'?'alert':t.type==='warn'?'alert':'info';
     return `<div class="toast ${t.type==='ok'?'ok':t.type==='err'?'err':t.type==='warn'?'warn':'info'}" id="${t.id}" role="status">
       <span class="ti">${ic(icn,16)}</span>
-      <div class="grow"><b>${t.title}</b>${t.sub?`<span>${t.sub}</span>`:''}</div>
-      ${t.action?`<button class="act" onclick="(${t.action.fn})();dismissToast('${t.id}')">${t.action.t}</button>`:''}
+      <div class="grow"><b>${esc(t.title)}</b>${t.sub?`<span>${esc(t.sub)}</span>`:''}</div>
+      ${t.action?`<button class="act" onclick="(${t.action.fn})();dismissToast('${t.id}')">${esc(t.action.t)}</button>`:''}
       <button class="act" aria-label="بستن" onclick="dismissToast('${t.id}')">${ic('x',13)}</button>
     </div>`;}).join('');
 }
@@ -55,7 +55,7 @@ function openModal(o){
   closeModal();
   const ov=document.createElement('div');ov.className='ovl';ov.id=document.getElementById('ovl')?'ovl-m':'ovl';
   ov.innerHTML=`<div class="modal" role="dialog" aria-modal="true" aria-label="${esc(o.title||'')}"><div class="box ${o.wide?'w-lg':''}">
-    <div class="m-h"><span class="grow t-h3">${o.title||''}</span><button class="ibtn" aria-label="بستن" onclick="closeModal()">${ic('x',17)}</button></div>
+    <div class="m-h"><span class="grow t-h3">${esc(o.title||'')}</span><button class="ibtn" aria-label="بستن" onclick="closeModal()">${ic('x',17)}</button></div>
     <div class="m-b">${o.body||''}</div>
     ${o.footer?`<div class="m-f">${o.footer}</div>`:''}
   </div></div>`;
@@ -69,7 +69,7 @@ function openDrawer(o){
   const ov=document.createElement('div');ov.className='ovl';ov.id='ovl';
   ov.innerHTML=`<div class="drawer ${o.wide?'w-lg':''}${o.cls?' '+o.cls:''}" role="dialog" aria-modal="true" aria-label="${esc(o.title||'')}">
     <div class="drawer-h">${o.icon?`<span style="color:var(--pr3)">${ic(o.icon,20)}</span>`:''}
-      <div class="grow"><div class="t-h3 ellip">${o.title||''}</div>${o.sub?`<div class="t-cap">${o.sub}</div>`:''}</div>
+      <div class="grow"><div class="t-h3 ellip">${esc(o.title||'')}</div>${o.sub?`<div class="t-cap">${esc(o.sub)}</div>`:''}</div>
       <button class="ibtn" aria-label="بستن" onclick="closeDrawer()">${ic('x',17)}</button></div>
     <div class="drawer-b" id="drw-body">${o.body||''}</div>
     ${o.footer?`<div class="drawer-f">${o.footer}</div>`:''}

@@ -116,7 +116,7 @@ function socReport(){
     <div class="card"><div class="card-h">${ic('history',15)}<span class="t-h3 grow">گزارش‌های قبلی</span></div>
      <div class="card-b" style="padding-top:2px">${RPT_HIST.map(r=>`<div class="appr"><span class="act-ic">${ic('filetext',13)}</span>
        <div class="bd grow"><b>${r.t}</b><span>${r.range} · ${emp(r.by).name}</span></div>
-       <button class="ibtn" data-tip="مشاهده" onclick="toast('info','گزارش قبلی','پیش‌نمایش در نسخه متصل فعال است.")">${ic('eye',14)}</button></div>`).join('')}</div></div>
+       <button class="ibtn" data-tip="مشاهده" onclick="toast('info','گزارش قبلی','پیش‌نمایش در نسخه متصل فعال است.')">${ic('eye',14)}</button></div>`).join('')}</div></div>
    </div>
    <div class="card" style="overflow:hidden"><div class="card-h">${ic('eye',16)}<span class="t-h3 grow">پیش‌نمایش زنده</span><span class="badge bd-pr">Effect Studio</span></div>
     <div style="padding:16px;overflow-y:auto">

@@ -1,8 +1,10 @@
 const {chromium}=require('playwright-core');
+const {APP_URL,testArtifactPath}=require('./paths');
+const {browserLaunchOptions}=require('./browser');
 (async()=>{
-  const b=await chromium.launch({args:['--no-sandbox']});
+  const b=await chromium.launch(browserLaunchOptions({args:['--no-sandbox']}));
   const pg=await b.newPage({viewport:{width:1500,height:950}});
-  await pg.goto('file:///home/user/effect-erp.html');
+  await pg.goto(APP_URL);
   await pg.waitForTimeout(300);
   await pg.fill('#ph','09121234567');await pg.click('#btn-ph');await pg.waitForTimeout(1300);
   await pg.$$eval('.otp-box',(els)=>els.forEach((el,i)=>{el.value='۱۲۳۴۵۶'[i];el.dispatchEvent(new Event('input',{bubbles:true}));}));
@@ -27,6 +29,6 @@ const {chromium}=require('playwright-core');
   console.log(JSON.stringify(r,null,1));
   const ok=(r.btnBg==='rgb(111, 106, 235)')&&(r.cardBg==='rgb(255, 255, 255)')&&(r.bodyFont==='IRANSansX')&&r.sections.length>=4;
   console.log(ok?'✅ visual tokens verified (#6F6AEB / white cards / IRANSansX / dashboard hierarchy)':'❌ token mismatch');
-  await pg.screenshot({path:'/home/user/shot-light-dashboard.png'});
+  await pg.screenshot({path:testArtifactPath('shot-light-dashboard.png')});
   await b.close();
 })().catch(e=>{console.log('ERR',e.message);process.exit(1)});

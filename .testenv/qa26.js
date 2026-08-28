@@ -1,12 +1,14 @@
 /* qa26 — Task Management UX Update (drawer + checklist + assignee dropdown) */
 const {chromium}=require('playwright-core');
+const {APP_URL}=require('./paths');
+const {browserLaunchOptions}=require('./browser');
 const P=[],OK=[];
 const ck=(id,p,d)=>{(p?OK:P).push((p?'✓ ':'✗ ')+id+(d?' — '+d:''));};
 (async()=>{
-  const b=await chromium.launch({args:['--no-sandbox']});
+  const b=await chromium.launch(browserLaunchOptions({args:['--no-sandbox']}));
   const pg=await b.newPage({viewport:{width:1440,height:900}});
   pg.on('pageerror',e=>P.push('✗ PAGEERROR '+e.message));
-  await pg.goto('file:///home/user/effect-erp.html');await pg.waitForTimeout(600);
+  await pg.goto(APP_URL);await pg.waitForTimeout(600);
   await pg.evaluate(()=>{S.authed=true;S.missionSeen=true;location.hash='#/tasks';S.taskScope='all';render();});
   await pg.waitForTimeout(500);
   let v;

@@ -1,5 +1,6 @@
 const fs=require('fs');const {JSDOM}=require('jsdom');
-const dom=new JSDOM(fs.readFileSync('/home/user/effect-erp.html','utf8'),{runScripts:'dangerously',pretendToBeVisual:true,url:'https://x.local/',beforeParse(w){w.scrollTo=()=>{};w.print=()=>{};}});
+const {APP_PATH}=require('./paths');
+const dom=new JSDOM(fs.readFileSync(APP_PATH,'utf8'),{runScripts:'dangerously',pretendToBeVisual:true,url:'https://x.local/',beforeParse(w){w.scrollTo=()=>{};w.print=()=>{};}});
 const w=dom.window,d=w.document;
 const routes=['#/dashboard','#/mytasks','#/calendar','#/workspaces','#/tasks','#/crm','#/crm/companies','#/crm/contacts','#/crm/opps','#/crm/acts','#/customers','#/customers/c1','#/leaves','#/finance','#/finance/in','#/finance/pay','#/finance/exp','#/finance/invoices','#/finance/proforma','#/finance/payroll','#/finance/acc','#/finance/tx','#/finance/rpt','#/reports','#/social','#/social/posts','#/social/report','#/team','#/team/e2','#/integrations','#/permissions','#/activity','#/notifications','#/settings'];
 (async()=>{

@@ -1,10 +1,12 @@
 const {chromium}=require('playwright-core');
+const {APP_URL}=require('./paths');
+const {browserLaunchOptions}=require('./browser');
 const problems=[],ok=[];
 (async()=>{
-  const b=await chromium.launch({args:['--no-sandbox']});
+  const b=await chromium.launch(browserLaunchOptions({args:['--no-sandbox']}));
   const pg=await b.newPage({viewport:{width:1440,height:900}});
   pg.on('pageerror',e=>problems.push('PAGEERROR: '+e.message));
-  await pg.goto('file:///home/user/effect-erp.html');
+  await pg.goto(APP_URL);
   await pg.waitForTimeout(600);
 
   // ===== 1) LOGIN دو ستونه =====
@@ -28,7 +30,7 @@ const problems=[],ok=[];
   }
   // mobile: art hidden
   const pg2=await b.newPage({viewport:{width:390,height:844}});
-  await pg2.goto('file:///home/user/effect-erp.html');await pg2.waitForTimeout(400);
+  await pg2.goto(APP_URL);await pg2.waitForTimeout(400);
   const m=await pg2.evaluate(()=>{const a=document.querySelector('.auth-art');return a?getComputedStyle(a).display:'none';});
   if(m!=='none')problems.push('mobile login art visible');else ok.push('mobile: image hidden, form full-width ✓');
   await pg2.close();

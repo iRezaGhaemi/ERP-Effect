@@ -56,7 +56,7 @@ function dashboardView(){
         <div class="card-b" style="padding-top:4px">
         ${missions.length?missions.slice(0,5).map(t=>`
           <div class="todo"><span class="ckb"><input type="checkbox" onchange="taskDone('${t.id}')"><span class="bx">${ic('check',11)}</span></span>
-            <div class="bd grow" style="min-width:0"><b class="ellip">${t.title}</b>
+            <div class="bd grow" style="min-width:0"><b class="ellip">${esc(t.title)}</b>
               <p>${prj(t.project).name} · ${emp(t.assignee).name}</p></div>
             ${prioBadge(t.prio)}${dueBadge(t.due)}</div>`).join(''):
           `<div class="empty-mini mt8">مامورتی برای امروز باقی نمانده — عالی است</div>`}
@@ -79,7 +79,7 @@ function dashboardView(){
       <div class="card"><div class="card-h">${ic('alert',15)}<span class="t-h3 grow">کارهای عقب‌افتاده</span><span class="badge bd-err">${fa(overdues.length)}</span></div>
         <div class="card-b" style="padding-top:4px">
         ${overdues.slice(0,4).map(t=>`<div class="appr" onclick="taskDrawer('${t.id}')" style="cursor:pointer">
-          <div class="bd grow" style="min-width:0"><b class="ellip">${t.title}</b><span>${emp(t.assignee).name} · ${prj(t.project).name}</span></div>${dueBadge(t.due)}</div>`).join('')}
+          <div class="bd grow" style="min-width:0"><b class="ellip">${esc(t.title)}</b><span>${emp(t.assignee).name} · ${prj(t.project).name}</span></div>${dueBadge(t.due)}</div>`).join('')}
         </div></div>
       ${can('leaves')?`<div class="card"><div class="card-h">${ic('leave',15)}<span class="t-h3 grow">درخواست‌های مرخصی</span>
           <button class="btn btn-sm btn-ghost" onclick="go('#/leaves')">همه</button></div>
@@ -150,7 +150,7 @@ function missionPopup(){
     </div>
     <div class="col mt16" style="gap:8px">
     ${missions.slice(0,3).map(t=>`<div class="row g8 mission-li" style="flex-wrap:wrap">
-      ${prioBadge(t.prio)}<span class="t-bs grow min0 ellip" style="color:var(--t1)">${t.title}</span>${dueBadge(t.due)}</div>`).join('')}
+      ${prioBadge(t.prio)}<span class="t-bs grow min0 ellip" style="color:var(--t1)">${esc(t.title)}</span>${dueBadge(t.due)}</div>`).join('')}
     ${meets.slice(0,1).map(m=>`<div class="row g8 mission-li" style="flex-wrap:wrap">
       <span class="badge bd-pr num">${fa(m.from)}</span><span class="t-bs grow min0 ellip" style="color:var(--t1)">${m.t}</span></div>`).join('')}
     </div></div>`,

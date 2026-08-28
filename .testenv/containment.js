@@ -1,11 +1,13 @@
 const {chromium}=require('playwright-core');
+const {APP_URL}=require('./paths');
+const {browserLaunchOptions}=require('./browser');
 (async()=>{
-  const b=await chromium.launch({args:['--no-sandbox']});
+  const b=await chromium.launch(browserLaunchOptions({args:['--no-sandbox']}));
   const problems=[];
   const scrollableAnc=el=>{let p=el.parentElement;while(p&&p!==document.body){const st=getComputedStyle(p);if(/(auto|scroll)/.test(st.overflowX+st.overflowY))return true;p=p.parentElement;}return false;};
   for(const vp of [{w:1500,h:950},{w:1280,h:850},{w:768,h:1000},{w:390,h:844}]){
     const pg=await b.newPage({viewport:{width:vp.w,height:vp.h}});
-    await pg.goto('file:///home/user/effect-erp.html');
+    await pg.goto(APP_URL);
     await pg.waitForTimeout(300);
     await pg.evaluate(()=>{S.authed=true;S.missionSeen=true;});
     for(const r of ['dashboard','tasks','mytasks','calendar','crm','customers','customers/c1','leaves','finance','finance/invoices','finance/payroll','finance/exp','social','social/posts','social/report','team','team/e2','integrations','permissions','reports','notifications','settings','workspaces','cpro','cpro/cp2','cpro/cp3','cpro/cp4',
