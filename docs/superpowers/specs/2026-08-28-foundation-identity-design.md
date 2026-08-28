@@ -20,7 +20,7 @@
 - قرارداد و validation: schemaهای مشترک Zod و OpenAPI تولیدشده از همان schemaها
 - اجرا: Docker Compose با سه سرویس `web`، `api` و `postgres`
 - مدل استقرار: یک Next.js، یک NestJS و یک PostgreSQL؛ بدون microservice
-- ارائه‌دهنده پیامک: قرارداد قابل‌تعویض با `ConsoleSmsProvider` در توسعه و آداپتور واقعی در production
+- ارائه‌دهنده پیامک: قرارداد قابل‌تعویض با `ConsoleSmsProvider` در توسعه، `FakeSmsProvider` در تست و `HttpSmsProvider` عمومی در production
 - ثبت‌نام: فقط دعوت/ایجاد کاربر توسط مدیر؛ بدون ثبت‌نام عمومی
 
 Redis در فاز اول اضافه نمی‌شود. OTP، محدودیت تلاش و نشست‌ها در PostgreSQL ذخیره می‌شوند. اگر اندازه بار یا اجرای چند replica این تصمیم را ناکافی کرد، ذخیره rate-limit و challenge می‌تواند بعداً بدون تغییر قرارداد API به Redis منتقل شود.
@@ -43,6 +43,7 @@ packages/
     auth/                      # OTP، token و session
     users/                     # کاربر و پروفایل
     access-control/            # role، permission، guard و override
+    audit/                     # لاگ حسابرسی append-only و جست‌وجو
 
   shared/
     contracts/                 # قراردادهای عمومی و error envelope
@@ -91,6 +92,10 @@ packages/features/auth/
 
 مالک نقش، مجوز، انتساب نقش، override اختصاصی، guard و decoratorهای مجوز است. شناسه کاربر را مصرف می‌کند اما جزئیات احراز هویت را نمی‌شناسد.
 
+### audit
+
+مالک ثبت append-only رخدادهای محصول و API جست‌وجوی read-only است. featureهای دیگر فقط از قرارداد `AuditWriter` استفاده می‌کنند و امکان ویرایش یا حذف رکورد audit ندارند.
+
 ### database
 
 مالک DataSource، تنظیم اتصال و ترتیب migrationها است. Entity متعلق به feature باقی می‌ماند، ولی همه تغییرات schema با migration مرکزی، versioned و قابل بازبینی اعمال می‌شوند.
@@ -123,6 +128,10 @@ packages/features/auth/
 ### OtpChallenge
 
 شامل شماره موبایل، hash کد، تعداد تلاش، زمان انقضا، زمان مصرف، IP درخواست و زمان ایجاد است. challenge پس از موفقیت فقط یک بار و درون transaction مصرف می‌شود.
+
+### RateLimitBucket
+
+شامل scope، hash کلید محدودسازی، شروع پنجره، شمارنده، زمان مسدودی و زمان به‌روزرسانی است. شماره موبایل یا IP خام در کلید bucket ذخیره نمی‌شود. به‌روزرسانی شمارنده atomic است و برای شماره‌های ناموجود نیز انجام می‌شود تا محدودسازی باعث افشای عضویت نشود.
 
 ### Session و RefreshToken
 
@@ -231,7 +240,7 @@ GET    /api/v1/audit-logs
     "code": "OTP_EXPIRED",
     "message": "کد تأیید منقضی شده است.",
     "fields": {},
-    "requestId": "req_..."
+    "requestId": "req_01J67R8T9F3K2M"
   }
 }
 ```
@@ -264,14 +273,14 @@ GET    /api/v1/audit-logs
 
 - `synchronize` همیشه `false` است.
 - migration با job/command جداگانه پیش از جایگزینی API اجرا می‌شود.
-- `ConsoleSmsProvider` مجاز نیست و API در صورت انتخاب آن fail-fast می‌شود.
+- `ConsoleSmsProvider` و `FakeSmsProvider` مجاز نیستند و API در صورت انتخاب آن‌ها fail-fast می‌شود. `HttpSmsProvider` پیام استاندارد `{recipient, message, requestId}` را با Bearer token به gateway تنظیم‌شده ارسال می‌کند.
 - endpointهای readiness اتصال دیتابیس و liveness حیات process را جداگانه گزارش می‌کنند.
 
 تست‌ها از `FakeSmsProvider` قابل کنترل استفاده می‌کنند و برای دریافت OTP به خواندن log وابسته نیستند.
 
 ## ۱۱. لاگ و مشاهده‌پذیری
 
-هر درخواست یک `requestId` دارد و لاگ‌ها JSON هستند. شماره موبایل، OTP، access token، refresh token، cookie و secret هیچ‌گاه کامل log نمی‌شوند. رویدادهای ورود موفق/ناموفق، rate limit، token reuse، تغییر مجوز و ابطال نشست با سطح و metadata مناسب ثبت می‌شوند.
+هر درخواست یک `requestId` دارد و لاگ‌های ساختاریافته JSON هستند. شماره موبایل، OTP، access token، refresh token، cookie و secret هیچ‌گاه کامل وارد لاگ ساختاریافته یا production نمی‌شوند. تنها استثنا، خروجی صریح و محلی `ConsoleSmsProvider` در محیط development است که کد را برای ورود توسعه‌دهنده نمایش می‌دهد و در production قابل انتخاب نیست. رویدادهای ورود موفق/ناموفق، rate limit، token reuse، تغییر مجوز و ابطال نشست با سطح و metadata مناسب ثبت می‌شوند.
 
 Audit log محصول از log عملیاتی جداست: اولی برای پاسخ‌گویی مدیریتی و امنیتی در PostgreSQL است؛ دومی برای پایش process و عیب‌یابی به stdout نوشته می‌شود.
 
