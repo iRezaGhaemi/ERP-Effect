@@ -19,6 +19,8 @@ RUN pnpm install --frozen-lockfile
 
 FROM dependencies AS build
 
+ARG INTERNAL_API_URL=http://localhost:3001
+ENV INTERNAL_API_URL=$INTERNAL_API_URL
 COPY . .
 RUN pnpm --filter @effect/web build
 

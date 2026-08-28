@@ -1,14 +1,10 @@
 import type { NextConfig } from 'next';
 
-const internalApiUrl = process.env.INTERNAL_API_URL;
+const internalApiUrl = process.env.INTERNAL_API_URL ?? 'http://localhost:3001';
 
 const nextConfig: NextConfig = {
   output: 'standalone',
   async rewrites() {
-    if (!internalApiUrl) {
-      return [];
-    }
-
     return [
       {
         source: '/api/:path*',

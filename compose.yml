@@ -43,6 +43,8 @@ services:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
+      args:
+        INTERNAL_API_URL: http://api:3001
     environment:
       INTERNAL_API_URL: http://api:3001
     depends_on:

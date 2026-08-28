@@ -1,7 +1,6 @@
 {
-  "extends": "../../packages/shared/typescript-config/nest.json",
+  "extends": "../../shared/typescript-config/nest.json",
   "compilerOptions": {
-    "target": "ES2024",
     "rootDir": "src",
     "outDir": "dist"
   },

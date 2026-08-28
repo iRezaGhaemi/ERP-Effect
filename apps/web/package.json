@@ -7,6 +7,7 @@
     "dev": "next dev",
     "start": "next start",
     "test": "vitest run --config vitest.config.ts",
+    "test:rewrite": "INTERNAL_API_URL=http://api:3001 pnpm run build && node test/rewrite-manifest.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
