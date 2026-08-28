@@ -15,6 +15,10 @@
     "./migrations/202608280002-create-audit-logs": {
       "types": "./dist/migrations/202608280002-create-audit-logs.d.ts",
       "default": "./dist/migrations/202608280002-create-audit-logs.js"
+    },
+    "./migrations/202608280003-reconcile-audit-logs-actor-null": {
+      "types": "./dist/migrations/202608280003-reconcile-audit-logs-actor-null.d.ts",
+      "default": "./dist/migrations/202608280003-reconcile-audit-logs-actor-null.js"
     }
   },
   "scripts": {

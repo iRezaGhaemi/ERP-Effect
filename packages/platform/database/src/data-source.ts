@@ -5,6 +5,7 @@ import { DataSource } from 'typeorm';
 import { entityRegistry } from './entity-registry.js';
 import { CreateUsers202608280001 } from './migrations/202608280001-create-users.js';
 import { CreateAuditLogs202608280002 } from './migrations/202608280002-create-audit-logs.js';
+import { ReconcileAuditLogsActorNull202608280003 } from './migrations/202608280003-reconcile-audit-logs-actor-null.js';
 
 export type DatabaseOptions = {
   url: string;
@@ -15,7 +16,11 @@ export function createDataSource(options: DatabaseOptions): DataSource {
     type: 'postgres',
     url: options.url,
     entities: entityRegistry,
-    migrations: [CreateUsers202608280001, CreateAuditLogs202608280002],
+    migrations: [
+      CreateUsers202608280001,
+      CreateAuditLogs202608280002,
+      ReconcileAuditLogsActorNull202608280003,
+    ],
     synchronize: false,
   });
 }

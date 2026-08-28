@@ -4,12 +4,15 @@ import { DataSource, type EntityManager } from "typeorm";
 import { AuditEventSchema, type AuditEvent } from "../contracts/index.js";
 import { AuditLogEntity } from "../entities/index.js";
 
+import { assertSafeAuditMetadata } from "./audit-metadata.js";
+
 @Injectable()
 export class AuditWriter {
   constructor(private readonly dataSource: DataSource) {}
 
   async write(event: AuditEvent, manager?: EntityManager): Promise<void> {
     const values = AuditEventSchema.parse(event);
+    assertSafeAuditMetadata(values.metadata);
     const repository = (manager ?? this.dataSource.manager).getRepository(
       AuditLogEntity,
     );
