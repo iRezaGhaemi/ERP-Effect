@@ -25,27 +25,44 @@ const sensitiveKeys = new Set([
   'JWT_ACCESS_SECRET',
 ]);
 
-function redactNestedSecrets(value: unknown): unknown {
+function isPlainObject(value: object): value is Record<string, unknown> {
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
+function redactNestedSecrets(value: unknown, seen = new WeakMap<object, unknown>()): unknown {
   if (Array.isArray(value)) {
-    return value.map(redactNestedSecrets);
+    const existing = seen.get(value);
+    if (existing) {
+      return existing;
+    }
+
+    const redacted: unknown[] = [];
+    seen.set(value, redacted);
+    redacted.push(...value.map((item) => redactNestedSecrets(item, seen)));
+    return redacted;
   }
 
-  if (value === null || typeof value !== 'object') {
+  if (value === null || typeof value !== 'object' || !isPlainObject(value)) {
     return value;
   }
 
-  return Object.fromEntries(
-    Object.entries(value).map(([key, nestedValue]) => [
-      key,
-      sensitiveKeys.has(key) ? '[Redacted]' : redactNestedSecrets(nestedValue),
-    ]),
-  );
+  const existing = seen.get(value);
+  if (existing) {
+    return existing;
+  }
+
+  const redacted: Record<string, unknown> = {};
+  seen.set(value, redacted);
+  for (const [key, nestedValue] of Object.entries(value)) {
+    redacted[key] = sensitiveKeys.has(key) ? '[Redacted]' : redactNestedSecrets(nestedValue, seen);
+  }
+
+  return redacted;
 }
 
 function redactLogObject(object: Record<string, unknown>): Record<string, unknown> {
-  return Object.fromEntries(
-    Object.entries(object).map(([key, value]) => [key, redactNestedSecrets(value)]),
-  );
+  return redactNestedSecrets(object) as Record<string, unknown>;
 }
 
 export function createAppLogger(destination?: DestinationStream): Logger {

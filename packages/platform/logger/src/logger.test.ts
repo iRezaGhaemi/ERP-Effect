@@ -46,4 +46,25 @@ describe('createAppLogger', () => {
     expect(output).not.toContain('nested-code');
     expect(output).not.toContain('deep-refresh-token');
   });
+
+  it('handles circular payloads without corrupting non-plain values', () => {
+    let output = '';
+    const destination = new Writable({
+      write(chunk, _encoding, callback) {
+        output += chunk.toString();
+        callback();
+      },
+    });
+    const logger = createAppLogger(destination);
+    const circular: { otp: string; self?: unknown } = { otp: 'circular-otp' };
+    circular.self = circular;
+    const occurredAt = new Date('2026-08-28T12:00:00.000Z');
+    const error = new Error('database unavailable');
+
+    expect(() => logger.info({ circular, occurredAt, err: error }, 'request failed')).not.toThrow();
+    expect(output).toContain('[Redacted]');
+    expect(output).not.toContain('circular-otp');
+    expect(output).toContain('2026-08-28T12:00:00.000Z');
+    expect(output).toContain('database unavailable');
+  });
 });
