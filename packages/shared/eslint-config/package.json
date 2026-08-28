@@ -3,6 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "dependencies": {
+    "next": "^16.3.3"
+  },
   "exports": {
     "./base": "./base.mjs",
     "./next": "./next.mjs"
