@@ -10,8 +10,11 @@ const RawEnvSchema = z
     OTP_PEPPER: z.string().min(32),
     JWT_ACCESS_SECRET: z.string().min(32),
     SMS_PROVIDER: z.enum(['console', 'fake', 'http']).default('console'),
-    SMS_HTTP_URL: z.url().optional(),
-    SMS_HTTP_TOKEN: z.string().min(1).optional(),
+    SMS_HTTP_URL: z.preprocess((value) => (value === '' ? undefined : value), z.url().optional()),
+    SMS_HTTP_TOKEN: z.preprocess(
+      (value) => (value === '' ? undefined : value),
+      z.string().min(1).optional(),
+    ),
     INITIAL_ADMIN_PHONE: z.string().min(1),
     COOKIE_SECURE: z.enum(['true', 'false']).optional(),
     OTP_TTL_SECONDS: z.coerce.number().int().positive().default(120),
@@ -24,6 +27,14 @@ const RawEnvSchema = z
         code: 'custom',
         message: 'SMS_PROVIDER must be http in production.',
         path: ['SMS_PROVIDER'],
+      });
+    }
+
+    if (env.NODE_ENV !== 'development' && env.COOKIE_SECURE === 'false') {
+      context.addIssue({
+        code: 'custom',
+        message: 'COOKIE_SECURE must be true outside development.',
+        path: ['COOKIE_SECURE'],
       });
     }
 

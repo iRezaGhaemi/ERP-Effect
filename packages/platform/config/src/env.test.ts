@@ -53,4 +53,24 @@ describe('parseEnv', () => {
 
     expect(env.SMS_PROVIDER).toBe('http');
   });
+
+  it('accepts empty optional HTTP settings for the console provider', () => {
+    const env = parseEnv({ ...baseEnv, SMS_HTTP_URL: '', SMS_HTTP_TOKEN: '' });
+
+    expect(env.SMS_HTTP_URL).toBeUndefined();
+    expect(env.SMS_HTTP_TOKEN).toBeUndefined();
+  });
+
+  it('rejects production configuration that disables secure cookies', () => {
+    expect(() =>
+      parseEnv({
+        ...baseEnv,
+        NODE_ENV: 'production',
+        SMS_PROVIDER: 'http',
+        SMS_HTTP_URL: 'https://sms.example.com/send',
+        SMS_HTTP_TOKEN: 'sms-token',
+        COOKIE_SECURE: 'false',
+      }),
+    ).toThrow(/COOKIE_SECURE/);
+  });
 });

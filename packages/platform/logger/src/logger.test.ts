@@ -20,4 +20,30 @@ describe('createAppLogger', () => {
     expect(output).toContain('[Redacted]');
     expect(output).not.toContain('123456');
   });
+
+  it('redacts nested secrets from structured logs', () => {
+    let output = '';
+    const destination = new Writable({
+      write(chunk, _encoding, callback) {
+        output += chunk.toString();
+        callback();
+      },
+    });
+    const logger = createAppLogger(destination);
+
+    logger.info(
+      {
+        auth: { accessToken: 'nested-access-token' },
+        delivery: { otp: '654321', code: 'nested-code' },
+        audit: [{ payload: { session: { refreshToken: 'deep-refresh-token' } } }],
+      },
+      'sending one-time password',
+    );
+
+    expect(output).toContain('[Redacted]');
+    expect(output).not.toContain('nested-access-token');
+    expect(output).not.toContain('654321');
+    expect(output).not.toContain('nested-code');
+    expect(output).not.toContain('deep-refresh-token');
+  });
 });
