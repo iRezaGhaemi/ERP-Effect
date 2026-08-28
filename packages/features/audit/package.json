@@ -1,0 +1,36 @@
+{
+  "name": "@effect/audit",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./contracts": {
+      "types": "./dist/contracts/index.d.ts",
+      "default": "./dist/contracts/index.js"
+    },
+    "./entities": {
+      "types": "./dist/entities/index.d.ts",
+      "default": "./dist/entities/index.js"
+    },
+    "./server": {
+      "types": "./dist/server/index.d.ts",
+      "default": "./dist/server/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "pnpm run build",
+    "test": "vitest run --config vitest.config.ts",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
+  },
+  "dependencies": {
+    "@effect-erp/contracts": "workspace:*",
+    "@nestjs/common": "^11.1.17",
+    "typeorm": "^0.3.28",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@effect-erp/testing": "workspace:*",
+    "@types/node": "^24.0.0"
+  }
+}

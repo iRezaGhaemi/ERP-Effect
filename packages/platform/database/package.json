@@ -11,6 +11,10 @@
     "./migrations/202608280001-create-users": {
       "types": "./dist/migrations/202608280001-create-users.d.ts",
       "default": "./dist/migrations/202608280001-create-users.js"
+    },
+    "./migrations/202608280002-create-audit-logs": {
+      "types": "./dist/migrations/202608280002-create-audit-logs.d.ts",
+      "default": "./dist/migrations/202608280002-create-audit-logs.js"
     }
   },
   "scripts": {
@@ -19,6 +23,7 @@
     "test": "vitest run --config vitest.config.ts"
   },
   "dependencies": {
+    "@effect/audit": "workspace:*",
     "@effect/users": "workspace:*",
     "@nestjs/common": "^11.1.17",
     "pg": "^8.16.3",

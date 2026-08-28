@@ -53,6 +53,9 @@ importers:
       '@effect-erp/logger':
         specifier: workspace:*
         version: link:../../packages/platform/logger
+      '@effect/audit':
+        specifier: workspace:*
+        version: link:../../packages/features/audit
       '@effect/users':
         specifier: workspace:*
         version: link:../../packages/features/users
@@ -116,6 +119,28 @@ importers:
         specifier: ^19.2.3
         version: 19.2.5(@types/react@19.2.18)
 
+  packages/features/audit:
+    dependencies:
+      '@effect-erp/contracts':
+        specifier: workspace:*
+        version: link:../../shared/contracts
+      '@nestjs/common':
+        specifier: ^11.1.17
+        version: 11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      typeorm:
+        specifier: ^0.3.28
+        version: 0.3.31(pg@8.23.0)
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@effect-erp/testing':
+        specifier: workspace:*
+        version: link:../../platform/testing
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.13.3
+
   packages/features/users:
     dependencies:
       '@effect-erp/contracts':
@@ -150,6 +175,9 @@ importers:
 
   packages/platform/database:
     dependencies:
+      '@effect/audit':
+        specifier: workspace:*
+        version: link:../../features/audit
       '@effect/users':
         specifier: workspace:*
         version: link:../../features/users
