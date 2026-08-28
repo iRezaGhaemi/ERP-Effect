@@ -1,0 +1,32 @@
+{
+  "name": "@effect/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx watch src/main.ts",
+    "start": "node dist/main.js",
+    "test": "vitest run --config vitest.config.ts",
+    "test:e2e": "vitest run --config vitest.config.ts"
+  },
+  "dependencies": {
+    "@effect-erp/config": "workspace:*",
+    "@effect-erp/contracts": "workspace:*",
+    "@effect-erp/database": "workspace:*",
+    "@effect-erp/logger": "workspace:*",
+    "@nestjs/common": "^11.1.17",
+    "@nestjs/core": "^11.1.17",
+    "@nestjs/platform-express": "^11.1.17",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "typeorm": "^0.3.28"
+  },
+  "devDependencies": {
+    "@nestjs/testing": "^11.1.17",
+    "@types/node": "^24.0.0",
+    "@types/supertest": "^6.0.3",
+    "supertest": "^7.2.0",
+    "tsx": "^4.21.0"
+  }
+}
