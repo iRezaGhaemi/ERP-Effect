@@ -43,13 +43,32 @@ function redactNestedSecrets(value: unknown, seen = new WeakMap<object, unknown>
     return redacted;
   }
 
-  if (value === null || typeof value !== 'object' || !isPlainObject(value)) {
+  if (value === null || typeof value !== 'object') {
     return value;
   }
 
   const existing = seen.get(value);
   if (existing) {
     return existing;
+  }
+
+  if (!isPlainObject(value)) {
+    const redacted = new Proxy(value, {
+      get(target, property) {
+        if (typeof property === 'string' && sensitiveKeys.has(property)) {
+          return '[Redacted]';
+        }
+
+        const nestedValue = Reflect.get(target, property, target);
+        if (target instanceof Date && typeof nestedValue === 'function') {
+          return nestedValue.bind(target);
+        }
+
+        return redactNestedSecrets(nestedValue, seen);
+      },
+    });
+    seen.set(value, redacted);
+    return redacted;
   }
 
   const redacted: Record<string, unknown> = {};

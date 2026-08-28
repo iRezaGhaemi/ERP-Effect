@@ -67,4 +67,45 @@ describe('createAppLogger', () => {
     expect(output).toContain('2026-08-28T12:00:00.000Z');
     expect(output).toContain('database unavailable');
   });
+
+  it('redacts enumerable secrets on custom instances and errors', () => {
+    class DeliveryMetadata {
+      readonly label = 'delivery';
+      readonly accessToken = 'instance-access-token';
+      readonly otp = 'instance-otp';
+    }
+
+    let output = '';
+    const destination = new Writable({
+      write(chunk, _encoding, callback) {
+        output += chunk.toString();
+        callback();
+      },
+    });
+    const logger = createAppLogger(destination);
+    const error = Object.assign(new Error('database unavailable'), {
+      refreshToken: 'error-refresh-token',
+      code: 'error-code',
+      SMS_HTTP_TOKEN: 'error-sms-token',
+      OTP_PEPPER: 'error-otp-pepper',
+      JWT_ACCESS_SECRET: 'error-jwt-secret',
+    });
+
+    logger.info({ delivery: new DeliveryMetadata(), err: error }, 'request failed');
+
+    expect(output).toContain('[Redacted]');
+    expect(output).toContain('delivery');
+    expect(output).toContain('database unavailable');
+    for (const secret of [
+      'instance-access-token',
+      'instance-otp',
+      'error-refresh-token',
+      'error-code',
+      'error-sms-token',
+      'error-otp-pepper',
+      'error-jwt-secret',
+    ]) {
+      expect(output).not.toContain(secret);
+    }
+  });
 });
