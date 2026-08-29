@@ -1,46 +1,60 @@
 const sensitiveKeyFragments = [
-  'accesstoken',
-  'refreshtoken',
-  'authorization',
-  'credential',
-  'cookie',
-  'otp',
-  'password',
-  'secret',
+  "token",
+  "code",
+  "phone",
+  "mobile",
+  "msisdn",
+  "telephone",
+  "authorization",
+  "credential",
+  "cookie",
+  "otp",
+  "password",
+  "secret",
 ] as const;
 
+const invalidAuditMetadataError = "Invalid audit metadata.";
+
 function isSensitiveKey(key: string): boolean {
-  const normalized = key.replace(/[^a-z0-9]/gi, '').toLowerCase();
-  return sensitiveKeyFragments.some((fragment) => normalized.includes(fragment));
+  const normalized = key.replace(/[^a-z0-9]/gi, "").toLowerCase();
+  return sensitiveKeyFragments.some((fragment) =>
+    normalized.includes(fragment),
+  );
 }
 
-function assertSafeValue(value: unknown, path: string, seen: WeakSet<object>): void {
-  if (Array.isArray(value)) {
-    value.forEach((item, index) => assertSafeValue(item, `${path}[${index}]`, seen));
-    return;
-  }
-
-  if (typeof value !== 'object' || value === null) {
+function assertSafeValue(value: unknown, seen: WeakSet<object>): void {
+  if (typeof value !== "object" || value === null) {
     return;
   }
 
   if (seen.has(value)) {
-    throw new Error('Audit metadata must not contain circular references.');
+    throw new Error(invalidAuditMetadataError);
   }
   seen.add(value);
 
   try {
+    if (Array.isArray(value)) {
+      value.forEach((item) => assertSafeValue(item, seen));
+      return;
+    }
+
     for (const [key, child] of Object.entries(value)) {
       if (isSensitiveKey(key)) {
-        throw new Error(`Sensitive audit metadata key at ${path}.${key}.`);
+        throw new Error(invalidAuditMetadataError);
       }
-      assertSafeValue(child, `${path}.${key}`, seen);
+      assertSafeValue(child, seen);
     }
   } finally {
     seen.delete(value);
   }
 }
 
-export function assertSafeAuditMetadata(metadata: Record<string, unknown>): void {
-  assertSafeValue(metadata, 'metadata', new WeakSet());
+export function assertSafeAuditMetadata(
+  metadata: Record<string, unknown>,
+): void {
+  try {
+    assertSafeValue(metadata, new WeakSet());
+  } catch {
+    throw new Error(invalidAuditMetadataError);
+  }
 }

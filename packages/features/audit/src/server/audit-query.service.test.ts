@@ -79,6 +79,15 @@ describe("audit services", () => {
       { transport: [{ Cookie: "session-cookie" }] },
       { delivery: { SMS_Credentials: "sms-credential" } },
       { nested: [{ SeCrEt: "secret" }] },
+      { sessionToken: "session-token" },
+      { api_token: "api-token" },
+      { verification: { code: "123456" } },
+      { phoneNumber: "+989121234567" },
+      { AUTHORIZATION: "Bearer credential" },
+      { pass_word: "password" },
+      { mobile: "+989121234567" },
+      { msisdn: "+989121234567" },
+      { tele_phone: "+989121234567" },
     ];
 
     for (const metadata of sensitiveMetadata) {
@@ -92,10 +101,66 @@ describe("audit services", () => {
           ipAddress: "127.0.0.1",
           requestId: "req_2",
         }),
-      ).rejects.toThrow(/sensitive audit metadata key/i);
+      ).rejects.toThrow("Invalid audit metadata.");
     }
 
     expect(saved).toHaveLength(0);
+  });
+
+  it("rejects self-referential arrays with a constant safe error", async () => {
+    const writer = new AuditWriter({
+      manager: { getRepository: () => ({}) },
+    } as never);
+    const entries: unknown[] = [];
+    entries.push(entries);
+
+    await expect(
+      writer.write({
+        actorId: null,
+        action: "auth.otp_rejected",
+        entityType: "auth",
+        entityId: null,
+        metadata: { entries },
+        ipAddress: "127.0.0.1",
+        requestId: "req_5",
+      }),
+    ).rejects.toThrow("Invalid audit metadata.");
+  });
+
+  it("does not reflect sensitive metadata keys or values in errors", async () => {
+    const writer = new AuditWriter({
+      manager: { getRepository: () => ({}) },
+    } as never);
+    const key = "Session_Token__attacker_key";
+    const value = "attacker-controlled-secret";
+
+    await expect(
+      writer.write({
+        actorId: null,
+        action: "auth.otp_rejected",
+        entityType: "auth",
+        entityId: null,
+        metadata: { [key]: value },
+        ipAddress: "127.0.0.1",
+        requestId: "req_6",
+      }),
+    ).rejects.toThrow("Invalid audit metadata.");
+
+    try {
+      await writer.write({
+        actorId: null,
+        action: "auth.otp_rejected",
+        entityType: "auth",
+        entityId: null,
+        metadata: { [key]: value },
+        ipAddress: "127.0.0.1",
+        requestId: "req_7",
+      });
+    } catch (error) {
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).not.toContain(key);
+      expect((error as Error).message).not.toContain(value);
+    }
   });
 
   it("persists useful non-sensitive nested metadata", async () => {
@@ -112,7 +177,10 @@ describe("audit services", () => {
         }),
       },
     } as never);
-    const metadata = { channel: "sms", outcomes: [{ retryable: true, reason: "expired" }] };
+    const metadata = {
+      channel: "sms",
+      outcomes: [{ retryable: true, reason: "expired" }],
+    };
 
     await writer.write({
       actorId: null,

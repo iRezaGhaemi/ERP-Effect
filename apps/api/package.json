@@ -6,6 +6,7 @@
   "scripts": {
     "build": "pnpm --filter @effect-erp/config build && pnpm --filter @effect-erp/contracts build && pnpm --filter @effect/audit build && pnpm --filter @effect/users build && pnpm --filter @effect-erp/database build && pnpm --filter @effect-erp/logger build && tsc -p tsconfig.json",
     "dev": "tsx watch src/main.ts",
+    "migrate": "node dist/migrate.js",
     "start": "node dist/main.js",
     "test": "pnpm run build && vitest run --config vitest.config.ts",
     "test:e2e": "pnpm run build && vitest run --config vitest.config.ts",

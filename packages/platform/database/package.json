@@ -19,6 +19,10 @@
     "./migrations/202608280003-reconcile-audit-logs-actor-null": {
       "types": "./dist/migrations/202608280003-reconcile-audit-logs-actor-null.d.ts",
       "default": "./dist/migrations/202608280003-reconcile-audit-logs-actor-null.js"
+    },
+    "./migrations/202608280004-harden-audit-log-boundary": {
+      "types": "./dist/migrations/202608280004-harden-audit-log-boundary.d.ts",
+      "default": "./dist/migrations/202608280004-harden-audit-log-boundary.js"
     }
   },
   "scripts": {
