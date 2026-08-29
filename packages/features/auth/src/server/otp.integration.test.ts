@@ -17,6 +17,19 @@ import { FakeSmsProvider } from "./sms/fake-sms.provider.js";
 
 const dataSources: DataSource[] = [];
 
+class ControlledBackgroundRunner {
+  readonly tasks: Array<() => Promise<void>> = [];
+
+  schedule(task: () => Promise<void>): void {
+    this.tasks.push(task);
+  }
+
+  async runAll(): Promise<void> {
+    const tasks = this.tasks.splice(0);
+    await Promise.all(tasks.map(async (task) => task().catch(() => undefined)));
+  }
+}
+
 afterEach(async () => {
   await Promise.all(dataSources.splice(0).map((source) => source.destroy()));
 });
@@ -90,6 +103,7 @@ describe("OTP request persistence", () => {
         ["+989121234567", "کاربر", "فعال"],
       );
       const sms = new FakeSmsProvider();
+      const background = new ControlledBackgroundRunner();
       const pepper = "integration-otp-pepper-at-least-32-characters";
       const limiter = new RateLimitService(database.runtime, pepper);
       const service = new OtpService(
@@ -99,6 +113,7 @@ describe("OTP request persistence", () => {
         sms,
         new AuditWriter(database.runtime),
         { pepper, ttlSeconds: 120, resendSeconds: 60 },
+        background,
       );
 
       const response = await service.request(
@@ -109,11 +124,23 @@ describe("OTP request persistence", () => {
           userAgent: "vitest",
         },
       );
+      const [{ count: beforeCount }] = await database.runtime.query<
+        Array<{ count: string }>
+      >(`SELECT COUNT(*)::text AS count FROM otp_challenges`);
+      expect(beforeCount).toBe("0");
+      expect(sms.sent).toHaveLength(0);
+
+      await background.runAll();
+
       const code = sms.sent[0]?.message.match(/\d{6}/)?.[0];
       const [challenge] = await database.runtime.query<
-        Array<{ codeHash: string; attempts: number }>
+        Array<{
+          codeHash: string;
+          attempts: number;
+          invalidatedAt: Date | null;
+        }>
       >(
-        `SELECT code_hash AS "codeHash", attempts FROM otp_challenges WHERE id = $1`,
+        `SELECT code_hash AS "codeHash", attempts, invalidated_at AS "invalidatedAt" FROM otp_challenges WHERE id = $1`,
         [response.challengeId],
       );
       const buckets = await database.runtime.query<Array<{ keyHash: string }>>(
@@ -123,10 +150,11 @@ describe("OTP request persistence", () => {
       expect(challenge).toMatchObject({
         attempts: 0,
         codeHash: expect.stringMatching(/^[a-f\d]{64}$/),
+        invalidatedAt: null,
       });
       expect(challenge?.codeHash).not.toBe(code);
       expect(JSON.stringify(challenge)).not.toContain(code);
-      expect(buckets).toHaveLength(2);
+      expect(buckets).toHaveLength(3);
       expect(JSON.stringify(buckets)).not.toContain("+989121234567");
       expect(JSON.stringify(buckets)).not.toContain("127.0.0.1");
     } finally {
@@ -161,6 +189,53 @@ describe("OTP request persistence", () => {
     }
   });
 
+  it("atomically admits one of two concurrent resends while accounting every bucket", async () => {
+    const database = await prepareDatabase();
+    try {
+      const pepper = "integration-otp-pepper-at-least-32-characters";
+      const background = new ControlledBackgroundRunner();
+      const service = new OtpService(
+        database.runtime,
+        new UsersFacade(database.runtime),
+        new RateLimitService(database.runtime, pepper),
+        new FakeSmsProvider(),
+        new AuditWriter(database.runtime),
+        { pepper, ttlSeconds: 120, resendSeconds: 60 },
+        background,
+      );
+      const requestContext = {
+        requestId: "req_resend",
+        ipAddress: "127.0.0.2",
+        userAgent: "vitest",
+      };
+
+      const results = await Promise.allSettled([
+        service.request({ phone: "09121234569" }, requestContext),
+        service.request({ phone: "09121234569" }, requestContext),
+      ]);
+      const buckets = await database.runtime.query<
+        Array<{ scope: string; requestCount: number }>
+      >(
+        `SELECT scope, request_count AS "requestCount" FROM rate_limit_buckets ORDER BY scope`,
+      );
+
+      expect(
+        results.filter(({ status }) => status === "fulfilled"),
+      ).toHaveLength(1);
+      expect(
+        results.filter(({ status }) => status === "rejected"),
+      ).toHaveLength(1);
+      expect(buckets).toEqual([
+        { scope: "otp:ip", requestCount: 2 },
+        { scope: "otp:phone", requestCount: 2 },
+        { scope: "otp:resend", requestCount: 2 },
+      ]);
+      expect(background.tasks).toHaveLength(1);
+    } finally {
+      await database.stop();
+    }
+  });
+
   it("commits invalidation and a safe audit event when delivery fails", async () => {
     const database = await prepareDatabase();
     try {
@@ -171,6 +246,7 @@ describe("OTP request persistence", () => {
         ["+989121234567", "کاربر", "فعال"],
       );
       const pepper = "integration-otp-pepper-at-least-32-characters";
+      const background = new ControlledBackgroundRunner();
       const service = new OtpService(
         database.runtime,
         new UsersFacade(database.runtime),
@@ -182,6 +258,7 @@ describe("OTP request persistence", () => {
         },
         new AuditWriter(database.runtime),
         { pepper, ttlSeconds: 120, resendSeconds: 60 },
+        background,
       );
 
       const response = await service.request(
@@ -197,6 +274,8 @@ describe("OTP request persistence", () => {
         challengeId: expect.any(String),
         retryAfterSeconds: 60,
       });
+
+      await background.runAll();
 
       const [challenge] = await database.runtime.query<
         Array<{ invalidatedAt: Date; userId: string }>

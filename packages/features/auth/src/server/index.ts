@@ -3,6 +3,14 @@ export type { AuthOptions } from "./auth.options.js";
 export { AuthController } from "./auth.controller.js";
 export { AuthModule } from "./auth.module.js";
 export { OtpService } from "./otp.service.js";
+export {
+  InProcessOtpBackgroundRunner,
+  OTP_BACKGROUND_RUNNER,
+} from "./otp-background-runner.js";
+export type {
+  OtpBackgroundRunner,
+  OtpBackgroundTask,
+} from "./otp-background-runner.js";
 export { RateLimitError, RateLimitService } from "./rate-limit.service.js";
 export type { RateLimitPolicy, RateLimitScope } from "./rate-limit.service.js";
 export { ConsoleSmsProvider } from "./sms/console-sms.provider.js";

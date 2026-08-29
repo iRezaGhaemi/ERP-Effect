@@ -6,6 +6,10 @@ import { Logger, Module } from "@nestjs/common";
 import { AUTH_OPTIONS } from "./auth.options.js";
 import { AuthController } from "./auth.controller.js";
 import { OtpService } from "./otp.service.js";
+import {
+  InProcessOtpBackgroundRunner,
+  OTP_BACKGROUND_RUNNER,
+} from "./otp-background-runner.js";
 import { RateLimitService } from "./rate-limit.service.js";
 import { ConsoleSmsProvider } from "./sms/console-sms.provider.js";
 import { FakeSmsProvider } from "./sms/fake-sms.provider.js";
@@ -58,9 +62,19 @@ function loadEnv() {
         );
       },
     },
+    {
+      provide: OTP_BACKGROUND_RUNNER,
+      useClass: InProcessOtpBackgroundRunner,
+    },
     RateLimitService,
     OtpService,
   ],
-  exports: [AUTH_OPTIONS, SMS_PROVIDER, RateLimitService, OtpService],
+  exports: [
+    AUTH_OPTIONS,
+    SMS_PROVIDER,
+    OTP_BACKGROUND_RUNNER,
+    RateLimitService,
+    OtpService,
+  ],
 })
 export class AuthModule {}

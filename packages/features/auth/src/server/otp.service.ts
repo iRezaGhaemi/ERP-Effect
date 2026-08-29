@@ -13,6 +13,10 @@ import {
 } from "../contracts/index.js";
 import { OtpChallengeEntity } from "../entities/index.js";
 import { AUTH_OPTIONS, type AuthOptions } from "./auth.options.js";
+import {
+  OTP_BACKGROUND_RUNNER,
+  type OtpBackgroundRunner,
+} from "./otp-background-runner.js";
 import { RateLimitService } from "./rate-limit.service.js";
 import { SMS_PROVIDER, type SmsProvider } from "./sms/sms-provider.js";
 
@@ -25,6 +29,8 @@ export class OtpService {
     @Inject(SMS_PROVIDER) private readonly sms: SmsProvider,
     private readonly auditWriter: AuditWriter,
     @Inject(AUTH_OPTIONS) private readonly options: AuthOptions,
+    @Inject(OTP_BACKGROUND_RUNNER)
+    private readonly backgroundRunner: OtpBackgroundRunner,
   ) {}
 
   async request(
@@ -42,16 +48,31 @@ export class OtpService {
         limit: 20,
         windowSeconds: 600,
       }),
+      this.rateLimiter.consume("otp:resend", phone, {
+        limit: 1,
+        windowSeconds: this.options.resendSeconds,
+      }),
     ]);
     const rejected = rateLimitResults.find(
       (result): result is PromiseRejectedResult => result.status === "rejected",
     );
     if (rejected) throw rejected.reason;
 
-    const user = await this.users.findActiveByPhone(phone);
-    if (!user) return this.accepted(randomUUID());
-
     const challengeId = randomUUID();
+    this.backgroundRunner.schedule(() =>
+      this.deliverActiveChallenge(challengeId, phone, context),
+    );
+    return this.accepted(challengeId);
+  }
+
+  private async deliverActiveChallenge(
+    challengeId: string,
+    phone: string,
+    context: RequestContext,
+  ): Promise<void> {
+    const user = await this.users.findActiveByPhone(phone);
+    if (!user) return;
+
     const code = randomInt(0, 1_000_000).toString().padStart(6, "0");
     const codeHash = createHmac("sha256", this.options.pepper)
       .update(`${challengeId}:${code}`)
@@ -69,7 +90,7 @@ export class OtpService {
           attempts: 0,
           expiresAt,
           consumedAt: null,
-          invalidatedAt: null,
+          invalidatedAt: new Date(),
           requestIp: context.ipAddress,
         }),
       );
@@ -82,10 +103,15 @@ export class OtpService {
         requestId: context.requestId,
       });
     } catch {
-      await this.compensateDeliveryFailure(challengeId, context);
+      await this.auditDeliveryFailureBestEffort(challengeId, context);
+      return;
     }
 
-    return this.accepted(challengeId);
+    await this.dataSource.transaction(async (manager) => {
+      await manager
+        .getRepository(OtpChallengeEntity)
+        .update({ id: challengeId }, { invalidatedAt: null });
+    });
   }
 
   private accepted(challengeId: string): RequestOtpResponse {
@@ -96,26 +122,27 @@ export class OtpService {
     };
   }
 
-  private async compensateDeliveryFailure(
+  private async auditDeliveryFailureBestEffort(
     challengeId: string,
     context: RequestContext,
   ): Promise<void> {
-    await this.dataSource.transaction(async (manager) => {
-      await manager
-        .getRepository(OtpChallengeEntity)
-        .update({ id: challengeId }, { invalidatedAt: new Date() });
-      await this.auditWriter.write(
-        {
-          actorId: null,
-          action: "auth.otp_delivery_failed",
-          entityType: "otp_challenges",
-          entityId: challengeId,
-          metadata: {},
-          ipAddress: context.ipAddress,
-          requestId: context.requestId,
-        },
-        manager,
-      );
-    });
+    try {
+      await this.dataSource.transaction(async (manager) => {
+        await this.auditWriter.write(
+          {
+            actorId: null,
+            action: "auth.otp_delivery_failed",
+            entityType: "otp_challenges",
+            entityId: challengeId,
+            metadata: {},
+            ipAddress: context.ipAddress,
+            requestId: context.requestId,
+          },
+          manager,
+        );
+      });
+    } catch {
+      // The challenge was committed invalid before delivery; audit failure cannot activate it.
+    }
   }
 }

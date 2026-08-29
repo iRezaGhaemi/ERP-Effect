@@ -6,7 +6,7 @@ import { DataSource } from "typeorm";
 
 import { AUTH_OPTIONS, type AuthOptions } from "./auth.options.js";
 
-export type RateLimitScope = "otp:phone" | "otp:ip";
+export type RateLimitScope = "otp:phone" | "otp:ip" | "otp:resend";
 export type RateLimitPolicy = { limit: number; windowSeconds: number };
 
 type RateLimitResult = {
