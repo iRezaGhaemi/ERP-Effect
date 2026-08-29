@@ -7,6 +7,7 @@ import { CreateUsers202608280001 } from "./migrations/202608280001-create-users.
 import { CreateAuditLogs202608280002 } from "./migrations/202608280002-create-audit-logs.js";
 import { ReconcileAuditLogsActorNull202608280003 } from "./migrations/202608280003-reconcile-audit-logs-actor-null.js";
 import { HardenAuditLogBoundary202608280004 } from "./migrations/202608280004-harden-audit-log-boundary.js";
+import { CreateAccessControl202608280005 } from "./migrations/202608280005-create-access-control.js";
 
 export type DatabaseOptions = {
   url: string;
@@ -22,6 +23,7 @@ export function createDataSource(options: DatabaseOptions): DataSource {
       CreateAuditLogs202608280002,
       ReconcileAuditLogsActorNull202608280003,
       HardenAuditLogBoundary202608280004,
+      CreateAccessControl202608280005,
     ],
     synchronize: false,
   });

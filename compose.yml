@@ -41,7 +41,7 @@ services:
       INITIAL_ADMIN_PHONE: "09121234567"
       COOKIE_SECURE: "false"
     depends_on:
-      migrate:
+      seed:
         condition: service_completed_successfully
     healthcheck:
       test:
@@ -54,6 +54,18 @@ services:
       retries: 10
     ports:
       - "3001:3001"
+
+  seed:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    command: ["node", "dist/seed.js"]
+    environment:
+      DATABASE_URL: postgres://effect:effect@postgres:5432/effect_erp
+      INITIAL_ADMIN_PHONE: "09121234567"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
 
   web:
     build:

@@ -23,6 +23,10 @@
     "./migrations/202608280004-harden-audit-log-boundary": {
       "types": "./dist/migrations/202608280004-harden-audit-log-boundary.d.ts",
       "default": "./dist/migrations/202608280004-harden-audit-log-boundary.js"
+    },
+    "./migrations/202608280005-create-access-control": {
+      "types": "./dist/migrations/202608280005-create-access-control.d.ts",
+      "default": "./dist/migrations/202608280005-create-access-control.js"
     }
   },
   "scripts": {
@@ -31,6 +35,7 @@
     "test": "vitest run --config vitest.config.ts"
   },
   "dependencies": {
+    "@effect/access-control": "workspace:*",
     "@effect/audit": "workspace:*",
     "@effect/users": "workspace:*",
     "@nestjs/common": "^11.1.17",

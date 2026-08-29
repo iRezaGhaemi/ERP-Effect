@@ -1,5 +1,5 @@
 {
-  "name": "@effect/users",
+  "name": "@effect/access-control",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -26,7 +26,9 @@
   "dependencies": {
     "@effect/audit": "workspace:*",
     "@effect-erp/contracts": "workspace:*",
+    "@effect/users": "workspace:*",
     "@nestjs/common": "^11.1.17",
+    "@nestjs/core": "^11.1.17",
     "typeorm": "^0.3.28",
     "zod": "^4.4.3"
   },

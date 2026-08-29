@@ -11,8 +11,8 @@ export const AuditEventSchema = z.object({
 });
 
 export const AuditQuerySchema = z.object({
-  page: z.number().int().positive(),
-  pageSize: z.number().int().positive(),
+  page: z.coerce.number().int().positive().default(1),
+  pageSize: z.coerce.number().int().positive().default(20),
 });
 
 export const AuditLogDtoSchema = AuditEventSchema.extend({
