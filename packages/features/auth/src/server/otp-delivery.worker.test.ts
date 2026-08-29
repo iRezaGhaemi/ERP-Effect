@@ -18,10 +18,12 @@ const options: OtpDeliveryWorkerOptions = {
   enabled: false,
   pollMilliseconds: 10_000,
   leaseSeconds: 30,
-  providerTimeoutMarginSeconds: 5,
+  providerTimeoutSeconds: 5,
+  activationMarginSeconds: 5,
   maxAttempts: 3,
   terminalRetentionSeconds: 86_400,
   cleanupBatchSize: 500,
+  cleanupIntervalMilliseconds: 60_000,
 };
 
 function claimedJob(attempts = 1) {
@@ -336,33 +338,75 @@ describe("OtpDeliveryWorker", () => {
     ]);
   });
 
-  it("terminalizes nearly expired jobs before calling the provider", async () => {
-    const job = {
-      ...claimedJob(),
-      expiresAt: new Date(Date.now() + 1_000),
-    };
-    const transaction = vi
-      .fn()
-      .mockImplementationOnce(async (work) =>
-        work({ query: vi.fn().mockResolvedValue([job]) }),
-      )
-      .mockImplementationOnce(async (work) =>
-        work({ query: vi.fn().mockResolvedValue([{ id: jobId }]) }),
+  it.each([5_001, 10_000])(
+    "terminalizes a job with %i milliseconds remaining before provider delivery",
+    async (remainingMilliseconds) => {
+      const now = Date.now();
+      const job = {
+        ...claimedJob(),
+        expiresAt: new Date(now + remainingMilliseconds),
+      };
+      const transaction = vi
+        .fn()
+        .mockImplementationOnce(async (work) =>
+          work({ query: vi.fn().mockResolvedValue([job]) }),
+        )
+        .mockImplementationOnce(async (work) =>
+          work({ query: vi.fn().mockResolvedValue([{ id: jobId }]) }),
+        );
+      const query = vi.fn().mockResolvedValue([{ id: jobId }]);
+      const sms = { send: vi.fn() };
+      const worker = new OtpDeliveryWorker(
+        { transaction, query } as never,
+        sms,
+        { write: vi.fn().mockResolvedValue(undefined) } as never,
+        new OtpCodeSealer(pepper),
+        options,
       );
-    const query = vi.fn().mockResolvedValue([{ id: jobId }]);
-    const sms = { send: vi.fn() };
+
+      const nowSpy = vi.spyOn(Date, "now").mockReturnValue(now);
+      try {
+        await worker.runOnce();
+      } finally {
+        nowSpy.mockRestore();
+      }
+
+      expect(sms.send).not.toHaveBeenCalled();
+      expect(query.mock.calls[0]?.[0]).toContain(`"status" = 'AUDIT_PENDING'`);
+      expect(query.mock.calls[0]?.[0]).toContain(`"lease_token" = $3`);
+      expect(query.mock.calls[0]?.[0]).toContain(`"claim_version" = $4`);
+      expect(query.mock.calls[0]?.[1]).toEqual([
+        jobId,
+        challengeId,
+        leaseToken,
+        claimVersion,
+      ]);
+    },
+  );
+
+  it("delivers a job with just over the full expiry margin remaining", async () => {
+    const now = Date.now();
+    const database = successfulDataSource({
+      ...claimedJob(),
+      expiresAt: new Date(now + 10_001),
+    });
+    const sms = { send: vi.fn().mockResolvedValue(undefined) };
     const worker = new OtpDeliveryWorker(
-      { transaction, query } as never,
+      database.source as never,
       sms,
-      { write: vi.fn().mockResolvedValue(undefined) } as never,
+      { write: vi.fn() } as never,
       new OtpCodeSealer(pepper),
       options,
     );
 
-    await worker.runOnce();
+    const nowSpy = vi.spyOn(Date, "now").mockReturnValue(now);
+    try {
+      await worker.runOnce();
+    } finally {
+      nowSpy.mockRestore();
+    }
 
-    expect(sms.send).not.toHaveBeenCalled();
-    expect(query.mock.calls[0]?.[0]).toContain(`"status" = 'AUDIT_PENDING'`);
+    expect(sms.send).toHaveBeenCalledTimes(1);
   });
 
   it("allows only a claimed job to be delivered across concurrent workers", async () => {
@@ -458,5 +502,143 @@ describe("OtpDeliveryWorker", () => {
     );
     expect(query.mock.calls[0]?.[0]).toContain(`LIMIT $2`);
     expect(query.mock.calls[0]?.[1]).toEqual([86_400, 500]);
+  });
+
+  it("runs terminal cleanup from the lifecycle at a bounded cadence", async () => {
+    vi.useFakeTimers();
+    try {
+      const transaction = vi.fn(async (work) =>
+        work({ query: vi.fn().mockResolvedValue([]) }),
+      );
+      const query = vi.fn().mockResolvedValue([{ deletedCount: "0" }]);
+      const worker = new OtpDeliveryWorker(
+        { transaction, query } as never,
+        { send: vi.fn() },
+        { write: vi.fn() } as never,
+        new OtpCodeSealer(pepper),
+        {
+          ...options,
+          enabled: true,
+          pollMilliseconds: 100,
+          cleanupIntervalMilliseconds: 1_000,
+        },
+      );
+
+      worker.onApplicationBootstrap();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(query).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(999);
+      expect(query).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(query).toHaveBeenCalledTimes(2);
+
+      await worker.onApplicationShutdown();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("processes claimed delivery before due terminal cleanup", async () => {
+    vi.useFakeTimers();
+    try {
+      const events: string[] = [];
+      const job = claimedJob();
+      let transactionCount = 0;
+      const transaction = vi.fn(async (work) => {
+        transactionCount += 1;
+        if (transactionCount === 1) {
+          return work({ query: vi.fn().mockResolvedValue([job]) });
+        }
+        if (transactionCount === 2) {
+          const completed = vi
+            .fn()
+            .mockResolvedValueOnce([{ id: challengeId }])
+            .mockResolvedValueOnce([{ id: jobId }]);
+          return work({ query: completed });
+        }
+        return work({ query: vi.fn().mockResolvedValue([]) });
+      });
+      const worker = new OtpDeliveryWorker(
+        {
+          transaction,
+          query: vi.fn().mockImplementation(async () => {
+            events.push("cleanup");
+            return [{ deletedCount: "0" }];
+          }),
+        } as never,
+        {
+          send: vi.fn().mockImplementation(async () => {
+            events.push("delivery");
+          }),
+        },
+        { write: vi.fn() } as never,
+        new OtpCodeSealer(pepper),
+        { ...options, enabled: true, pollMilliseconds: 100 },
+      );
+
+      worker.onApplicationBootstrap();
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(events).toEqual(["delivery", "cleanup"]);
+      await worker.onApplicationShutdown();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("continues delivery after a cleanup failure without logging details", async () => {
+    vi.useFakeTimers();
+    const error = vi
+      .spyOn(Logger.prototype, "error")
+      .mockImplementation(() => undefined);
+    try {
+      const job = claimedJob();
+      let deliveryClaimCount = 0;
+      const transaction = vi.fn(async (work) => {
+        return work({
+          query: vi.fn().mockImplementation((statement: string) => {
+            if (statement.includes(`"status" = 'PENDING'`)) {
+              deliveryClaimCount += 1;
+              return deliveryClaimCount === 2 ? [job] : [];
+            }
+            if (statement.includes(`UPDATE "otp_challenges"`)) {
+              return [{ id: challengeId }];
+            }
+            if (statement.includes(`"status" = 'SUCCEEDED'`)) {
+              return [{ id: jobId }];
+            }
+            return [];
+          }),
+        });
+      });
+      const sms = { send: vi.fn().mockResolvedValue(undefined) };
+      const worker = new OtpDeliveryWorker(
+        {
+          transaction,
+          query: vi.fn().mockRejectedValue(new Error("cleanup secret")),
+        } as never,
+        sms,
+        { write: vi.fn() } as never,
+        new OtpCodeSealer(pepper),
+        {
+          ...options,
+          enabled: true,
+          pollMilliseconds: 100,
+          cleanupIntervalMilliseconds: 1_000,
+        },
+      );
+
+      worker.onApplicationBootstrap();
+      await vi.advanceTimersByTimeAsync(100);
+
+      expect(sms.send).toHaveBeenCalledTimes(1);
+      expect(error).toHaveBeenCalledWith("OTP terminal cleanup failed.");
+      expect(JSON.stringify(error.mock.calls)).not.toContain("cleanup secret");
+      await worker.onApplicationShutdown();
+    } finally {
+      error.mockRestore();
+      vi.useRealTimers();
+    }
   });
 });

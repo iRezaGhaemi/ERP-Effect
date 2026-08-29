@@ -24,6 +24,12 @@ const RawEnvSchema = z
     COOKIE_SECURE: z.enum(["true", "false"]).optional(),
     OTP_TTL_SECONDS: z.coerce.number().int().positive().default(120),
     OTP_RESEND_SECONDS: z.coerce.number().int().positive().default(60),
+    OTP_DELIVERY_ACTIVATION_MARGIN_SECONDS: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(30)
+      .optional(),
     REFRESH_TTL_DAYS: z.coerce.number().int().positive().default(30),
   })
   .superRefine((env, context) => {
@@ -32,6 +38,18 @@ const RawEnvSchema = z
         code: "custom",
         message: "SMS_PROVIDER must be http in production.",
         path: ["SMS_PROVIDER"],
+      });
+    }
+
+    if (
+      env.NODE_ENV === "production" &&
+      env.OTP_DELIVERY_ACTIVATION_MARGIN_SECONDS === undefined
+    ) {
+      context.addIssue({
+        code: "custom",
+        message:
+          "OTP_DELIVERY_ACTIVATION_MARGIN_SECONDS is required in production.",
+        path: ["OTP_DELIVERY_ACTIVATION_MARGIN_SECONDS"],
       });
     }
 
@@ -62,6 +80,8 @@ const RawEnvSchema = z
 
 export const AppEnvSchema = RawEnvSchema.transform((env) => ({
   ...env,
+  OTP_DELIVERY_ACTIVATION_MARGIN_SECONDS:
+    env.OTP_DELIVERY_ACTIVATION_MARGIN_SECONDS ?? 5,
   COOKIE_SECURE: env.COOKIE_SECURE
     ? env.COOKIE_SECURE === "true"
     : env.NODE_ENV !== "development",

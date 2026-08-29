@@ -12,6 +12,7 @@ const baseEnv = {
   JWT_ACCESS_SECRET: "j".repeat(32),
   SMS_PROVIDER: "console",
   INITIAL_ADMIN_PHONE: "09121234567",
+  OTP_DELIVERY_ACTIVATION_MARGIN_SECONDS: "5",
 };
 
 describe("parseEnv", () => {
@@ -62,6 +63,44 @@ describe("parseEnv", () => {
 
     expect(env.SMS_HTTP_URL).toBeUndefined();
     expect(env.SMS_HTTP_TOKEN).toBeUndefined();
+  });
+
+  it("validates the bounded OTP delivery activation margin", () => {
+    expect(
+      parseEnv({
+        ...baseEnv,
+        OTP_DELIVERY_ACTIVATION_MARGIN_SECONDS: "30",
+      }).OTP_DELIVERY_ACTIVATION_MARGIN_SECONDS,
+    ).toBe(30);
+    expect(() =>
+      parseEnv({
+        ...baseEnv,
+        OTP_DELIVERY_ACTIVATION_MARGIN_SECONDS: "0",
+      }),
+    ).toThrow(/OTP_DELIVERY_ACTIVATION_MARGIN_SECONDS/);
+    expect(() =>
+      parseEnv({
+        ...baseEnv,
+        OTP_DELIVERY_ACTIVATION_MARGIN_SECONDS: "31",
+      }),
+    ).toThrow(/OTP_DELIVERY_ACTIVATION_MARGIN_SECONDS/);
+  });
+
+  it("requires an explicit OTP delivery activation margin in production", () => {
+    const {
+      OTP_DELIVERY_ACTIVATION_MARGIN_SECONDS: _activationMargin,
+      ...withoutActivationMargin
+    } = baseEnv;
+
+    expect(() =>
+      parseEnv({
+        ...withoutActivationMargin,
+        NODE_ENV: "production",
+        SMS_PROVIDER: "http",
+        SMS_HTTP_URL: "https://sms.example.com/send",
+        SMS_HTTP_TOKEN: "sms-token",
+      }),
+    ).toThrow(/OTP_DELIVERY_ACTIVATION_MARGIN_SECONDS/);
   });
 
   it("rejects production configuration that disables secure cookies", () => {

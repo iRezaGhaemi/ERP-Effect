@@ -38,6 +38,7 @@ services:
       OTP_PEPPER: development-otp-pepper-must-be-32-chars
       JWT_ACCESS_SECRET: development-jwt-secret-must-be-32-chars
       SMS_PROVIDER: console
+      OTP_DELIVERY_ACTIVATION_MARGIN_SECONDS: 5
       INITIAL_ADMIN_PHONE: "09121234567"
       COOKIE_SECURE: "false"
     depends_on:

@@ -7,6 +7,8 @@ type Fetcher = (
   init?: RequestInit,
 ) => Promise<Response>;
 
+export const HTTP_SMS_PROVIDER_TIMEOUT_MILLISECONDS = 5_000;
+
 function deliveryFailed(): DomainError {
   return new DomainError("SMS_DELIVERY_FAILED", "ارسال پیامک ناموفق بود.");
 }
@@ -16,7 +18,7 @@ export class HttpSmsProvider implements SmsProvider {
     private readonly url: string,
     private readonly token: string,
     private readonly fetcher: Fetcher = fetch,
-    private readonly timeoutMilliseconds = 5_000,
+    private readonly timeoutMilliseconds = HTTP_SMS_PROVIDER_TIMEOUT_MILLISECONDS,
   ) {}
 
   async send(input: SmsMessage): Promise<void> {

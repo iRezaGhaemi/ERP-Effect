@@ -18,7 +18,10 @@ import {
 import { RateLimitService } from "./rate-limit.service.js";
 import { ConsoleSmsProvider } from "./sms/console-sms.provider.js";
 import { FakeSmsProvider } from "./sms/fake-sms.provider.js";
-import { HttpSmsProvider } from "./sms/http-sms.provider.js";
+import {
+  HTTP_SMS_PROVIDER_TIMEOUT_MILLISECONDS,
+  HttpSmsProvider,
+} from "./sms/http-sms.provider.js";
 import { SMS_PROVIDER } from "./sms/sms-provider.js";
 
 function loadEnv() {
@@ -75,15 +78,21 @@ function loadEnv() {
     },
     {
       provide: OTP_DELIVERY_WORKER_OPTIONS,
-      useFactory: () => ({
-        enabled: loadEnv().NODE_ENV !== "test",
-        pollMilliseconds: 250,
-        leaseSeconds: 30,
-        providerTimeoutMarginSeconds: 5,
-        maxAttempts: 3,
-        terminalRetentionSeconds: 86_400,
-        cleanupBatchSize: 500,
-      }),
+      useFactory: () => {
+        const env = loadEnv();
+        return {
+          enabled: env.NODE_ENV !== "test",
+          pollMilliseconds: 250,
+          leaseSeconds: 30,
+          providerTimeoutSeconds:
+            HTTP_SMS_PROVIDER_TIMEOUT_MILLISECONDS / 1_000,
+          activationMarginSeconds: env.OTP_DELIVERY_ACTIVATION_MARGIN_SECONDS,
+          maxAttempts: 3,
+          terminalRetentionSeconds: 86_400,
+          cleanupBatchSize: 500,
+          cleanupIntervalMilliseconds: 60_000,
+        };
+      },
     },
     {
       provide: OTP_RESPONSE_ENVELOPE,

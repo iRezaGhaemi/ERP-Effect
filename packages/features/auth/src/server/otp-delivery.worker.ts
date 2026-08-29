@@ -17,10 +17,12 @@ export type OtpDeliveryWorkerOptions = {
   enabled: boolean;
   pollMilliseconds: number;
   leaseSeconds: number;
-  providerTimeoutMarginSeconds: number;
+  providerTimeoutSeconds: number;
+  activationMarginSeconds: number;
   maxAttempts: number;
   terminalRetentionSeconds: number;
   cleanupBatchSize: number;
+  cleanupIntervalMilliseconds: number;
 };
 
 export const OTP_DELIVERY_WORKER_OPTIONS = Symbol(
@@ -61,6 +63,7 @@ export class OtpDeliveryWorker
   private loopPromise: Promise<void> | undefined;
   private pollTimer: NodeJS.Timeout | undefined;
   private wakePoll: (() => void) | undefined;
+  private nextCleanupAtMilliseconds = 0;
 
   constructor(
     private readonly dataSource: DataSource,
@@ -74,6 +77,7 @@ export class OtpDeliveryWorker
   onApplicationBootstrap(): void {
     if (!this.options.enabled || this.loopPromise) return;
     this.stopping = false;
+    this.nextCleanupAtMilliseconds = 0;
     this.loopPromise = this.runLoop();
   }
 
@@ -174,13 +178,26 @@ export class OtpDeliveryWorker
 
   private async runLoop(): Promise<void> {
     while (!this.stopping) {
+      let worked = false;
       try {
-        const worked = await this.runOnce();
-        if (!worked) await this.waitForPoll();
+        worked = await this.runOnce();
       } catch {
         this.logger.error("OTP delivery worker cycle failed.");
-        await this.waitForPoll();
       }
+      if (!this.stopping) await this.cleanupIfDue();
+      if (!worked) await this.waitForPoll();
+    }
+  }
+
+  private async cleanupIfDue(): Promise<void> {
+    const now = Date.now();
+    if (now < this.nextCleanupAtMilliseconds) return;
+    this.nextCleanupAtMilliseconds =
+      now + this.options.cleanupIntervalMilliseconds;
+    try {
+      await this.cleanupTerminalRows();
+    } catch {
+      this.logger.error("OTP terminal cleanup failed.");
     }
   }
 
@@ -420,7 +437,10 @@ export class OtpDeliveryWorker
       job.expiresAt instanceof Date ? job.expiresAt : new Date(job.expiresAt);
     const remainingMilliseconds = expiresAt.getTime() - Date.now();
     return (
-      remainingMilliseconds <= this.options.providerTimeoutMarginSeconds * 1_000
+      remainingMilliseconds <=
+      (this.options.providerTimeoutSeconds +
+        this.options.activationMarginSeconds) *
+        1_000
     );
   }
 

@@ -149,10 +149,12 @@ describe("OTP request persistence", () => {
           enabled: false,
           pollMilliseconds: 1,
           leaseSeconds: 30,
-          providerTimeoutMarginSeconds: 5,
+          providerTimeoutSeconds: 5,
+          activationMarginSeconds: 5,
           maxAttempts: 3,
           terminalRetentionSeconds: 86_400,
           cleanupBatchSize: 500,
+          cleanupIntervalMilliseconds: 60_000,
         },
       );
       await worker.runOnce();
@@ -249,10 +251,12 @@ describe("OTP request persistence", () => {
         enabled: false,
         pollMilliseconds: 1,
         leaseSeconds: 30,
-        providerTimeoutMarginSeconds: 5,
+        providerTimeoutSeconds: 5,
+        activationMarginSeconds: 5,
         maxAttempts: 3,
         terminalRetentionSeconds: 86_400,
         cleanupBatchSize: 500,
+        cleanupIntervalMilliseconds: 60_000,
       };
       const firstWorker = new OtpDeliveryWorker(
         database.runtime,
@@ -345,6 +349,88 @@ describe("OTP request persistence", () => {
     }
   });
 
+  it("invokes terminal cleanup from the enabled worker lifecycle", async () => {
+    const database = await prepareDatabase();
+    try {
+      await database.runtime.query(
+        `INSERT INTO users (phone, "firstName", "lastName", status) VALUES ($1, $2, $3, 'ACTIVE')`,
+        ["+989121234567", "کاربر", "فعال"],
+      );
+      const pepper = "integration-otp-pepper-at-least-32-characters";
+      const service = new OtpService(
+        database.runtime,
+        new UsersFacade(database.runtime),
+        new RateLimitService(database.runtime, pepper),
+        { pepper, ttlSeconds: 120, resendSeconds: 60 },
+        new OtpCodeSealer(pepper),
+        new ShortOtpResponseEnvelope(0),
+      );
+      const response = await service.request(
+        { phone: "09121234567" },
+        {
+          requestId: "req_cleanup_lifecycle",
+          ipAddress: "127.0.0.4",
+          userAgent: "vitest",
+        },
+      );
+      const workerOptions = {
+        enabled: false,
+        pollMilliseconds: 10,
+        leaseSeconds: 30,
+        providerTimeoutSeconds: 5,
+        activationMarginSeconds: 5,
+        maxAttempts: 3,
+        terminalRetentionSeconds: 1,
+        cleanupBatchSize: 500,
+        cleanupIntervalMilliseconds: 60_000,
+      };
+      const deliveryWorker = new OtpDeliveryWorker(
+        database.runtime,
+        new FakeSmsProvider(),
+        new AuditWriter(database.runtime),
+        new OtpCodeSealer(pepper),
+        workerOptions,
+      );
+      await deliveryWorker.runOnce();
+      await database.runtime.query(
+        `UPDATE otp_challenges SET expires_at = now() - interval '2 hours' WHERE id = $1`,
+        [response.challengeId],
+      );
+      await database.runtime.query(
+        `UPDATE otp_delivery_jobs SET completed_at = now() - interval '2 hours', updated_at = now() - interval '2 hours' WHERE challenge_id = $1`,
+        [response.challengeId],
+      );
+
+      const cleanupWorker = new OtpDeliveryWorker(
+        database.runtime,
+        new FakeSmsProvider(),
+        new AuditWriter(database.runtime),
+        new OtpCodeSealer(pepper),
+        { ...workerOptions, enabled: true },
+      );
+      cleanupWorker.onApplicationBootstrap();
+      try {
+        await expect
+          .poll(async () => {
+            const [{ count }] = await database.runtime.query<
+              Array<{ count: string }>
+            >(`SELECT COUNT(*)::text AS count FROM otp_challenges`);
+            return count;
+          })
+          .toBe("0");
+      } finally {
+        await cleanupWorker.onApplicationShutdown();
+      }
+
+      const [{ jobCount }] = await database.runtime.query<
+        Array<{ jobCount: string }>
+      >(`SELECT COUNT(*)::text AS "jobCount" FROM otp_delivery_jobs`);
+      expect(jobCount).toBe("0");
+    } finally {
+      await database.stop();
+    }
+  });
+
   it("commits invalidation and a safe audit event when delivery fails", async () => {
     const database = await prepareDatabase();
     try {
@@ -391,10 +477,12 @@ describe("OTP request persistence", () => {
           enabled: false,
           pollMilliseconds: 1,
           leaseSeconds: 30,
-          providerTimeoutMarginSeconds: 5,
+          providerTimeoutSeconds: 5,
+          activationMarginSeconds: 5,
           maxAttempts: 1,
           terminalRetentionSeconds: 86_400,
           cleanupBatchSize: 500,
+          cleanupIntervalMilliseconds: 60_000,
         },
       );
       await worker.runOnce();
