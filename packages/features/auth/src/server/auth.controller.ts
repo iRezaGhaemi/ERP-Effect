@@ -30,6 +30,8 @@ function header(
 
 function statusFor(error: DomainError): number {
   if (error.code === "RATE_LIMITED") return HttpStatus.TOO_MANY_REQUESTS;
+  if (error.code === "OTP_REQUEST_UNAVAILABLE")
+    return HttpStatus.SERVICE_UNAVAILABLE;
   if (error.code === "SMS_DELIVERY_FAILED") return HttpStatus.BAD_GATEWAY;
   return HttpStatus.UNPROCESSABLE_ENTITY;
 }

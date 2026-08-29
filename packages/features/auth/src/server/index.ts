@@ -3,10 +3,17 @@ export type { AuthOptions } from "./auth.options.js";
 export { AuthController } from "./auth.controller.js";
 export { AuthModule } from "./auth.module.js";
 export { OtpService } from "./otp.service.js";
+export { OTP_CODE_SEALER, OtpCodeSealer } from "./otp-code-sealer.js";
+export type { SealedOtpCode } from "./otp-code-sealer.js";
 export {
-  MinimumDurationOtpResponseEnvelope,
+  OTP_DELIVERY_WORKER_OPTIONS,
+  OtpDeliveryWorker,
+} from "./otp-delivery.worker.js";
+export type { OtpDeliveryWorkerOptions } from "./otp-delivery.worker.js";
+export {
   OTP_RESPONSE_ENVELOPE,
-  OTP_RESPONSE_FLOOR_MILLISECONDS,
+  OTP_RESPONSE_PADDING_MILLISECONDS,
+  ShortOtpResponseEnvelope,
 } from "./otp-response-envelope.js";
 export type {
   OtpResponseClock,

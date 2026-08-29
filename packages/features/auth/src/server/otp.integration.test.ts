@@ -10,8 +10,11 @@ import { ReconcileAuditLogsActorNull202608280003 } from "../../../../platform/da
 import { HardenAuditLogBoundary202608280004 } from "../../../../platform/database/src/migrations/202608280004-harden-audit-log-boundary.js";
 import { CreateAccessControl202608280005 } from "../../../../platform/database/src/migrations/202608280005-create-access-control.js";
 import { CreateOtp202608280006 } from "../../../../platform/database/src/migrations/202608280006-create-otp.js";
+import { CreateOtpDeliveryOutbox202608280007 } from "../../../../platform/database/src/migrations/202608280007-create-otp-delivery-outbox.js";
 import { entityRegistry } from "../../../../platform/database/src/entity-registry.js";
-import { MinimumDurationOtpResponseEnvelope } from "./otp-response-envelope.js";
+import { OtpCodeSealer } from "./otp-code-sealer.js";
+import { OtpDeliveryWorker } from "./otp-delivery.worker.js";
+import { ShortOtpResponseEnvelope } from "./otp-response-envelope.js";
 import { OtpService } from "./otp.service.js";
 import { RateLimitService } from "./rate-limit.service.js";
 import { FakeSmsProvider } from "./sms/fake-sms.provider.js";
@@ -42,6 +45,7 @@ async function prepareDatabase(): Promise<{
       HardenAuditLogBoundary202608280004,
       CreateAccessControl202608280005,
       CreateOtp202608280006,
+      CreateOtpDeliveryOutbox202608280007,
     ],
     synchronize: false,
   });
@@ -97,10 +101,9 @@ describe("OTP request persistence", () => {
         database.runtime,
         new UsersFacade(database.runtime),
         limiter,
-        sms,
-        new AuditWriter(database.runtime),
         { pepper, ttlSeconds: 120, resendSeconds: 60 },
-        new MinimumDurationOtpResponseEnvelope(0),
+        new OtpCodeSealer(pepper),
+        new ShortOtpResponseEnvelope(0),
       );
 
       const response = await service.request(
@@ -115,7 +118,39 @@ describe("OTP request persistence", () => {
         Array<{ count: string }>
       >(`SELECT COUNT(*)::text AS count FROM otp_challenges`);
       expect(count).toBe("1");
-      expect(sms.sent).toHaveLength(1);
+      expect(sms.sent).toHaveLength(0);
+
+      const [pendingJob] = await database.runtime.query<
+        Array<{
+          status: string;
+          codeCiphertext: string;
+          codeNonce: string;
+          codeTag: string;
+        }>
+      >(
+        `SELECT status, code_ciphertext AS "codeCiphertext", code_nonce AS "codeNonce", code_tag AS "codeTag" FROM otp_delivery_jobs WHERE challenge_id = $1`,
+        [response.challengeId],
+      );
+      expect(pendingJob).toMatchObject({
+        status: "PENDING",
+        codeCiphertext: expect.any(String),
+        codeNonce: expect.any(String),
+        codeTag: expect.any(String),
+      });
+
+      const worker = new OtpDeliveryWorker(
+        database.runtime,
+        sms,
+        new AuditWriter(database.runtime),
+        new OtpCodeSealer(pepper),
+        {
+          enabled: false,
+          pollMilliseconds: 1,
+          leaseSeconds: 30,
+          maxAttempts: 3,
+        },
+      );
+      await worker.runOnce();
 
       const code = sms.sent[0]?.message.match(/\d{6}/)?.[0];
       const [challenge] = await database.runtime.query<
@@ -139,6 +174,13 @@ describe("OTP request persistence", () => {
       });
       expect(challenge?.codeHash).not.toBe(code);
       expect(JSON.stringify(challenge)).not.toContain(code);
+      expect(JSON.stringify(pendingJob)).not.toContain(code);
+      const [completedJob] = await database.runtime.query<
+        Array<{ status: string }>
+      >(`SELECT status FROM otp_delivery_jobs WHERE challenge_id = $1`, [
+        response.challengeId,
+      ]);
+      expect(completedJob).toEqual({ status: "SUCCEEDED" });
       expect(buckets).toHaveLength(3);
       expect(JSON.stringify(buckets)).not.toContain("+989121234567");
       expect(JSON.stringify(buckets)).not.toContain("127.0.0.1");
@@ -174,6 +216,83 @@ describe("OTP request persistence", () => {
     }
   });
 
+  it("retries a durable job and lets only one worker reclaim its stale lease", async () => {
+    const database = await prepareDatabase();
+    try {
+      await database.runtime.query(
+        `INSERT INTO users (phone, "firstName", "lastName", status) VALUES ($1, $2, $3, 'ACTIVE')`,
+        ["+989121234567", "کاربر", "فعال"],
+      );
+      const pepper = "integration-otp-pepper-at-least-32-characters";
+      const service = new OtpService(
+        database.runtime,
+        new UsersFacade(database.runtime),
+        new RateLimitService(database.runtime, pepper),
+        { pepper, ttlSeconds: 120, resendSeconds: 60 },
+        new OtpCodeSealer(pepper),
+        new ShortOtpResponseEnvelope(0),
+      );
+      const response = await service.request(
+        { phone: "09121234567" },
+        {
+          requestId: "req_reclaim",
+          ipAddress: "127.0.0.3",
+          userAgent: "vitest",
+        },
+      );
+      const workerOptions = {
+        enabled: false,
+        pollMilliseconds: 1,
+        leaseSeconds: 30,
+        maxAttempts: 3,
+      };
+      const firstWorker = new OtpDeliveryWorker(
+        database.runtime,
+        { send: async () => Promise.reject(new Error("transient")) },
+        new AuditWriter(database.runtime),
+        new OtpCodeSealer(pepper),
+        workerOptions,
+      );
+      await firstWorker.runOnce();
+      await database.runtime.query(
+        `UPDATE otp_delivery_jobs SET status = 'PROCESSING', lease_expires_at = now() - interval '1 second' WHERE challenge_id = $1`,
+        [response.challengeId],
+      );
+
+      const sms = new FakeSmsProvider();
+      const workers = Array.from(
+        { length: 2 },
+        () =>
+          new OtpDeliveryWorker(
+            database.runtime,
+            sms,
+            new AuditWriter(database.runtime),
+            new OtpCodeSealer(pepper),
+            workerOptions,
+          ),
+      );
+      const results = await Promise.all(
+        workers.map((worker) => worker.runOnce()),
+      );
+      const [state] = await database.runtime.query<
+        Array<{ status: string; attempts: number; invalidatedAt: Date | null }>
+      >(
+        `SELECT job.status, job.attempts, challenge.invalidated_at AS "invalidatedAt" FROM otp_delivery_jobs job JOIN otp_challenges challenge ON challenge.id = job.challenge_id WHERE job.challenge_id = $1`,
+        [response.challengeId],
+      );
+
+      expect(results.filter(Boolean)).toHaveLength(1);
+      expect(sms.sent).toHaveLength(1);
+      expect(state).toEqual({
+        status: "SUCCEEDED",
+        attempts: 2,
+        invalidatedAt: null,
+      });
+    } finally {
+      await database.stop();
+    }
+  });
+
   it("atomically admits one of two concurrent resends while accounting every bucket", async () => {
     const database = await prepareDatabase();
     try {
@@ -182,10 +301,9 @@ describe("OTP request persistence", () => {
         database.runtime,
         new UsersFacade(database.runtime),
         new RateLimitService(database.runtime, pepper),
-        new FakeSmsProvider(),
-        new AuditWriter(database.runtime),
         { pepper, ttlSeconds: 120, resendSeconds: 60 },
-        new MinimumDurationOtpResponseEnvelope(0),
+        new OtpCodeSealer(pepper),
+        new ShortOtpResponseEnvelope(0),
       );
       const requestContext = {
         requestId: "req_resend",
@@ -233,14 +351,9 @@ describe("OTP request persistence", () => {
         database.runtime,
         new UsersFacade(database.runtime),
         new RateLimitService(database.runtime, pepper),
-        {
-          send: async () => {
-            throw new Error("provider detail must not be persisted");
-          },
-        },
-        new AuditWriter(database.runtime),
         { pepper, ttlSeconds: 120, resendSeconds: 60 },
-        new MinimumDurationOtpResponseEnvelope(0),
+        new OtpCodeSealer(pepper),
+        new ShortOtpResponseEnvelope(0),
       );
 
       const response = await service.request(
@@ -256,6 +369,24 @@ describe("OTP request persistence", () => {
         challengeId: expect.any(String),
         retryAfterSeconds: 60,
       });
+
+      const worker = new OtpDeliveryWorker(
+        database.runtime,
+        {
+          send: async () => {
+            throw new Error("provider detail must not be persisted");
+          },
+        },
+        new AuditWriter(database.runtime),
+        new OtpCodeSealer(pepper),
+        {
+          enabled: false,
+          pollMilliseconds: 1,
+          leaseSeconds: 30,
+          maxAttempts: 1,
+        },
+      );
+      await worker.runOnce();
 
       const [challenge] = await database.runtime.query<
         Array<{ invalidatedAt: Date; userId: string }>
@@ -275,6 +406,11 @@ describe("OTP request persistence", () => {
         action: "auth.otp_delivery_failed",
         metadata: {},
       });
+      const [job] = await database.runtime.query<Array<{ status: string }>>(
+        `SELECT status FROM otp_delivery_jobs WHERE challenge_id = $1`,
+        [response.challengeId],
+      );
+      expect(job).toEqual({ status: "FAILED" });
     } finally {
       await database.stop();
     }

@@ -1,7 +1,6 @@
 import { createHmac, randomInt, randomUUID } from "node:crypto";
 
-import { AuditWriter } from "@effect/audit/server";
-import type { RequestContext } from "@effect-erp/contracts";
+import { DomainError, type RequestContext } from "@effect-erp/contracts";
 import { UsersFacade, normalizeIranianMobile } from "@effect/users/server";
 import { Inject, Injectable } from "@nestjs/common";
 import { DataSource } from "typeorm";
@@ -11,14 +10,21 @@ import {
   type RequestOtpInput,
   type RequestOtpResponse,
 } from "../contracts/index.js";
-import { OtpChallengeEntity } from "../entities/index.js";
+import { OtpChallengeEntity, OtpDeliveryJobEntity } from "../entities/index.js";
 import { AUTH_OPTIONS, type AuthOptions } from "./auth.options.js";
+import { OTP_CODE_SEALER, OtpCodeSealer } from "./otp-code-sealer.js";
 import {
   OTP_RESPONSE_ENVELOPE,
   type OtpResponseEnvelope,
 } from "./otp-response-envelope.js";
 import { RateLimitService } from "./rate-limit.service.js";
-import { SMS_PROVIDER, type SmsProvider } from "./sms/sms-provider.js";
+
+function requestUnavailable(): DomainError {
+  return new DomainError(
+    "OTP_REQUEST_UNAVAILABLE",
+    "درخواست کد ورود موقتاً در دسترس نیست.",
+  );
+}
 
 @Injectable()
 export class OtpService {
@@ -26,9 +32,8 @@ export class OtpService {
     private readonly dataSource: DataSource,
     private readonly users: UsersFacade,
     private readonly rateLimiter: RateLimitService,
-    @Inject(SMS_PROVIDER) private readonly sms: SmsProvider,
-    private readonly auditWriter: AuditWriter,
     @Inject(AUTH_OPTIONS) private readonly options: AuthOptions,
+    @Inject(OTP_CODE_SEALER) private readonly codeSealer: OtpCodeSealer,
     @Inject(OTP_RESPONSE_ENVELOPE)
     private readonly responseEnvelope: OtpResponseEnvelope,
   ) {}
@@ -61,17 +66,15 @@ export class OtpService {
     const challengeId = randomUUID();
     return this.responseEnvelope.run(async () => {
       try {
-        await this.deliverActiveChallenge(challengeId, phone, context);
+        await this.persistActiveDelivery(challengeId, phone, context);
       } catch {
-        // Accepted responses deliberately conceal membership and infrastructure state.
-        // A failure before the pending save sends no SMS; a later failure leaves the
-        // already committed challenge invalid.
+        throw requestUnavailable();
       }
       return this.accepted(challengeId);
     });
   }
 
-  private async deliverActiveChallenge(
+  private async persistActiveDelivery(
     challengeId: string,
     phone: string,
     context: RequestContext,
@@ -84,11 +87,12 @@ export class OtpService {
       .update(`${challengeId}:${code}`)
       .digest("hex");
     const expiresAt = new Date(Date.now() + this.options.ttlSeconds * 1_000);
+    const sealed = this.codeSealer.seal(code, challengeId);
 
     await this.dataSource.transaction(async (manager) => {
-      const repository = manager.getRepository(OtpChallengeEntity);
-      await repository.save(
-        repository.create({
+      const challenges = manager.getRepository(OtpChallengeEntity);
+      await challenges.save(
+        challenges.create({
           id: challengeId,
           userId: user.id,
           phone,
@@ -100,28 +104,23 @@ export class OtpService {
           requestIp: context.ipAddress,
         }),
       );
+      const jobs = manager.getRepository(OtpDeliveryJobEntity);
+      await jobs.save(
+        jobs.create({
+          id: randomUUID(),
+          challengeId,
+          codeCiphertext: sealed.ciphertext,
+          codeNonce: sealed.nonce,
+          codeTag: sealed.tag,
+          requestId: context.requestId.slice(0, 128) || "unknown",
+          status: "PENDING",
+          attempts: 0,
+          availableAt: new Date(),
+          leaseExpiresAt: null,
+          completedAt: null,
+        }),
+      );
     });
-
-    try {
-      await this.sms.send({
-        recipient: phone,
-        message: `کد ورود شما: ${code}`,
-        requestId: context.requestId,
-      });
-    } catch {
-      await this.auditDeliveryFailureBestEffort(challengeId, context);
-      return;
-    }
-
-    try {
-      await this.dataSource.transaction(async (manager) => {
-        await manager
-          .getRepository(OtpChallengeEntity)
-          .update({ id: challengeId }, { invalidatedAt: null });
-      });
-    } catch {
-      // Delivery may have been accepted, but an unconfirmed activation must fail closed.
-    }
   }
 
   private accepted(challengeId: string): RequestOtpResponse {
@@ -130,29 +129,5 @@ export class OtpService {
       challengeId,
       retryAfterSeconds: this.options.resendSeconds,
     };
-  }
-
-  private async auditDeliveryFailureBestEffort(
-    challengeId: string,
-    context: RequestContext,
-  ): Promise<void> {
-    try {
-      await this.dataSource.transaction(async (manager) => {
-        await this.auditWriter.write(
-          {
-            actorId: null,
-            action: "auth.otp_delivery_failed",
-            entityType: "otp_challenges",
-            entityId: challengeId,
-            metadata: {},
-            ipAddress: context.ipAddress,
-            requestId: context.requestId,
-          },
-          manager,
-        );
-      });
-    } catch {
-      // The challenge was committed invalid before delivery; audit failure cannot activate it.
-    }
   }
 }

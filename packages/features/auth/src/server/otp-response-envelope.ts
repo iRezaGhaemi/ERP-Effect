@@ -1,3 +1,5 @@
+import { performance } from "node:perf_hooks";
+
 export interface OtpResponseClock {
   nowMilliseconds(): number;
 }
@@ -12,15 +14,11 @@ export interface OtpResponseEnvelope {
 
 export const OTP_RESPONSE_ENVELOPE = Symbol("OTP_RESPONSE_ENVELOPE");
 
-/**
- * The SMS adapter is bounded to five seconds. The additional second normally
- * absorbs membership and challenge database work so accepted branches expose
- * the same minimum response duration.
- */
-export const OTP_RESPONSE_FLOOR_MILLISECONDS = 6_000;
+/** Short padding masks normal active persistence without retaining provider sockets. */
+export const OTP_RESPONSE_PADDING_MILLISECONDS = 75;
 
 const systemClock: OtpResponseClock = {
-  nowMilliseconds: () => Date.now(),
+  nowMilliseconds: () => performance.now(),
 };
 
 const systemSleeper: OtpResponseSleeper = {
@@ -28,9 +26,9 @@ const systemSleeper: OtpResponseSleeper = {
     new Promise((resolve) => setTimeout(resolve, milliseconds)),
 };
 
-export class MinimumDurationOtpResponseEnvelope implements OtpResponseEnvelope {
+export class ShortOtpResponseEnvelope implements OtpResponseEnvelope {
   constructor(
-    private readonly floorMilliseconds = OTP_RESPONSE_FLOOR_MILLISECONDS,
+    private readonly paddingMilliseconds = OTP_RESPONSE_PADDING_MILLISECONDS,
     private readonly clock: OtpResponseClock = systemClock,
     private readonly sleeper: OtpResponseSleeper = systemSleeper,
   ) {}
@@ -41,7 +39,7 @@ export class MinimumDurationOtpResponseEnvelope implements OtpResponseEnvelope {
       return await work();
     } finally {
       const elapsed = this.clock.nowMilliseconds() - startedAt;
-      const remaining = Math.max(0, this.floorMilliseconds - elapsed);
+      const remaining = Math.max(0, this.paddingMilliseconds - elapsed);
       if (remaining > 0) await this.sleeper.sleep(remaining);
     }
   }

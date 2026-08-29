@@ -5,10 +5,15 @@ import { Logger, Module } from "@nestjs/common";
 
 import { AUTH_OPTIONS } from "./auth.options.js";
 import { AuthController } from "./auth.controller.js";
+import { OTP_CODE_SEALER, OtpCodeSealer } from "./otp-code-sealer.js";
+import {
+  OTP_DELIVERY_WORKER_OPTIONS,
+  OtpDeliveryWorker,
+} from "./otp-delivery.worker.js";
 import { OtpService } from "./otp.service.js";
 import {
-  MinimumDurationOtpResponseEnvelope,
   OTP_RESPONSE_ENVELOPE,
+  ShortOtpResponseEnvelope,
 } from "./otp-response-envelope.js";
 import { RateLimitService } from "./rate-limit.service.js";
 import { ConsoleSmsProvider } from "./sms/console-sms.provider.js";
@@ -63,18 +68,37 @@ function loadEnv() {
       },
     },
     {
+      provide: OTP_CODE_SEALER,
+      inject: [AUTH_OPTIONS],
+      useFactory: (options: { pepper: string }) =>
+        new OtpCodeSealer(options.pepper),
+    },
+    {
+      provide: OTP_DELIVERY_WORKER_OPTIONS,
+      useFactory: () => ({
+        enabled: loadEnv().NODE_ENV !== "test",
+        pollMilliseconds: 250,
+        leaseSeconds: 30,
+        maxAttempts: 3,
+      }),
+    },
+    {
       provide: OTP_RESPONSE_ENVELOPE,
-      useFactory: () => new MinimumDurationOtpResponseEnvelope(),
+      useFactory: () => new ShortOtpResponseEnvelope(),
     },
     RateLimitService,
     OtpService,
+    OtpDeliveryWorker,
   ],
   exports: [
     AUTH_OPTIONS,
     SMS_PROVIDER,
     OTP_RESPONSE_ENVELOPE,
+    OTP_CODE_SEALER,
+    OTP_DELIVERY_WORKER_OPTIONS,
     RateLimitService,
     OtpService,
+    OtpDeliveryWorker,
   ],
 })
 export class AuthModule {}

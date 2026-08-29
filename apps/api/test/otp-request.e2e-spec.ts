@@ -1,9 +1,10 @@
 import { RequestOtpResponseSchema } from "@effect/auth/contracts";
 import {
   AUTH_OPTIONS,
-  MinimumDurationOtpResponseEnvelope,
   OTP_RESPONSE_ENVELOPE,
+  OtpDeliveryWorker,
   SMS_PROVIDER,
+  ShortOtpResponseEnvelope,
 } from "@effect/auth/server";
 import { entityRegistry } from "@effect-erp/database";
 import { startPostgresContainer } from "@effect-erp/testing";
@@ -20,6 +21,7 @@ import { ReconcileAuditLogsActorNull202608280003 } from "../../../packages/platf
 import { HardenAuditLogBoundary202608280004 } from "../../../packages/platform/database/src/migrations/202608280004-harden-audit-log-boundary.js";
 import { CreateAccessControl202608280005 } from "../../../packages/platform/database/src/migrations/202608280005-create-access-control.js";
 import { CreateOtp202608280006 } from "../../../packages/platform/database/src/migrations/202608280006-create-otp.js";
+import { CreateOtpDeliveryOutbox202608280007 } from "../../../packages/platform/database/src/migrations/202608280007-create-otp-delivery-outbox.js";
 
 const sources: DataSource[] = [];
 let app: INestApplication | undefined;
@@ -49,6 +51,7 @@ describe("OTP request API", () => {
           HardenAuditLogBoundary202608280004,
           CreateAccessControl202608280005,
           CreateOtp202608280006,
+          CreateOtpDeliveryOutbox202608280007,
         ],
         synchronize: false,
       });
@@ -66,7 +69,7 @@ describe("OTP request API", () => {
         .overrideProvider(SMS_PROVIDER)
         .useValue({ send: async (input: unknown) => sent.push(input) })
         .overrideProvider(OTP_RESPONSE_ENVELOPE)
-        .useValue(new MinimumDurationOtpResponseEnvelope(0))
+        .useValue(new ShortOtpResponseEnvelope(0))
         .overrideProvider(AUTH_OPTIONS)
         .useValue({
           pepper: "e2e-test-otp-pepper-at-least-32-characters",
@@ -97,11 +100,18 @@ describe("OTP request API", () => {
           "retryAfterSeconds",
         ]);
       }
-      expect(sent).toHaveLength(1);
+      expect(sent).toHaveLength(0);
       const [{ count }] = await source.query<Array<{ count: string }>>(
         `SELECT COUNT(*)::text AS count FROM otp_challenges`,
       );
       expect(count).toBe("1");
+      const [job] = await source.query<Array<{ status: string }>>(
+        `SELECT status FROM otp_delivery_jobs`,
+      );
+      expect(job).toEqual({ status: "PENDING" });
+
+      await module.get(OtpDeliveryWorker).runOnce();
+      expect(sent).toHaveLength(1);
     } finally {
       await Promise.all(sources.splice(0).map((source) => source.destroy()));
       await container.stop();

@@ -1,6 +1,7 @@
 import type { EntitySchema } from "typeorm";
 import {
   OtpChallengeEntity,
+  OtpDeliveryJobEntity,
   RateLimitBucketEntity,
 } from "@effect/auth/entities";
 import {
@@ -15,6 +16,7 @@ import { UserEntity } from "@effect/users/entities";
 
 export const entityRegistry: Array<Function | EntitySchema> = [
   OtpChallengeEntity,
+  OtpDeliveryJobEntity,
   RateLimitBucketEntity,
   UserEntity,
   AuditLogEntity,

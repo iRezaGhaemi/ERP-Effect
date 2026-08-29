@@ -31,6 +31,10 @@
     "./migrations/202608280006-create-otp": {
       "types": "./dist/migrations/202608280006-create-otp.d.ts",
       "default": "./dist/migrations/202608280006-create-otp.js"
+    },
+    "./migrations/202608280007-create-otp-delivery-outbox": {
+      "types": "./dist/migrations/202608280007-create-otp-delivery-outbox.d.ts",
+      "default": "./dist/migrations/202608280007-create-otp-delivery-outbox.js"
     }
   },
   "scripts": {

@@ -1,16 +1,20 @@
-import type { RequestContext } from "@effect-erp/contracts";
+import { DomainError, type RequestContext } from "@effect-erp/contracts";
 import { describe, expect, it, vi } from "vitest";
 
-import { FakeSmsProvider } from "./sms/fake-sms.provider.js";
-import { ConsoleSmsProvider } from "./sms/console-sms.provider.js";
-import { HttpSmsProvider } from "./sms/http-sms.provider.js";
+import { OtpChallengeEntity, OtpDeliveryJobEntity } from "../entities/index.js";
+import { OtpCodeSealer } from "./otp-code-sealer.js";
+import { AuthController } from "./auth.controller.js";
 import { OtpService } from "./otp.service.js";
 import {
-  MinimumDurationOtpResponseEnvelope,
-  OTP_RESPONSE_FLOOR_MILLISECONDS,
+  OTP_RESPONSE_PADDING_MILLISECONDS,
+  ShortOtpResponseEnvelope,
 } from "./otp-response-envelope.js";
 import { RateLimitService } from "./rate-limit.service.js";
+import { ConsoleSmsProvider } from "./sms/console-sms.provider.js";
+import { HttpSmsProvider } from "./sms/http-sms.provider.js";
 
+const pepper = "unit-test-otp-pepper-at-least-32-characters";
+const options = { pepper, ttlSeconds: 120, resendSeconds: 60 };
 const context: RequestContext = {
   requestId: "req_otp_unit",
   ipAddress: "127.0.0.1",
@@ -20,338 +24,182 @@ const context: RequestContext = {
 class VirtualResponseTime {
   milliseconds = 0;
   readonly sleeps: number[] = [];
-
   nowMilliseconds(): number {
     return this.milliseconds;
   }
-
   async sleep(milliseconds: number): Promise<void> {
     this.sleeps.push(milliseconds);
     this.milliseconds += milliseconds;
   }
 }
 
-const immediateEnvelope = new MinimumDurationOtpResponseEnvelope(0);
+const immediateEnvelope = new ShortOtpResponseEnvelope(0);
+
+function persistenceDouble() {
+  const saved: Array<{ entity: unknown; value: Record<string, unknown> }> = [];
+  const transaction = vi.fn(
+    async (work: (manager: unknown) => Promise<unknown>) =>
+      work({
+        getRepository: (entity: unknown) => ({
+          create: (value: Record<string, unknown>) => value,
+          save: (value: Record<string, unknown>) => {
+            saved.push({ entity, value: { ...value } });
+            return value;
+          },
+        }),
+      }),
+  );
+  return { dataSource: { transaction }, saved };
+}
 
 describe("OtpService.request", () => {
   it.each([
     ["active", { id: "6e444c58-63ee-4c74-b39d-f72a5eb84d3f" }],
     ["missing", null],
     ["suspended", null],
-  ])("returns the same public shape for %s users", async (_kind, foundUser) => {
-    const time = new VirtualResponseTime();
-    const saved: unknown[] = [];
-    const dataSource = {
-      transaction: vi.fn(async (work: (manager: unknown) => unknown) =>
-        work({
-          getRepository: () => ({
-            create: (value: unknown) => value,
-            save: (value: unknown) => {
-              saved.push(value);
-              return value;
-            },
-            update: vi.fn(),
-          }),
-        }),
-      ),
-    };
-    const users = { findActiveByPhone: vi.fn().mockResolvedValue(foundUser) };
-    const rateLimiter = { consume: vi.fn().mockResolvedValue(undefined) };
-    const sent: unknown[] = [];
-    const sms = {
-      send: async (input: unknown) => {
-        time.milliseconds += 5_000;
-        sent.push(input);
-      },
-    };
-    const audit = { write: vi.fn().mockResolvedValue(undefined) };
+  ])(
+    "returns the same public shape after durable work for %s users",
+    async (_kind, foundUser) => {
+      const persistence = persistenceDouble();
+      const users = { findActiveByPhone: vi.fn().mockResolvedValue(foundUser) };
+      const rateLimiter = { consume: vi.fn().mockResolvedValue(undefined) };
+      const service = new OtpService(
+        persistence.dataSource as never,
+        users as never,
+        rateLimiter as never,
+        options,
+        new OtpCodeSealer(pepper),
+        immediateEnvelope,
+      );
+
+      const result = await service.request({ phone: "09121234567" }, context);
+
+      expect(result).toEqual({
+        accepted: true,
+        challengeId: expect.any(String),
+        retryAfterSeconds: 60,
+      });
+      expect(rateLimiter.consume).toHaveBeenCalledTimes(3);
+      expect(rateLimiter.consume).toHaveBeenCalledWith(
+        "otp:resend",
+        "+989121234567",
+        { limit: 1, windowSeconds: 60 },
+      );
+      expect(users.findActiveByPhone).toHaveBeenCalledTimes(1);
+      expect(persistence.saved).toHaveLength(foundUser ? 2 : 0);
+      if (foundUser) {
+        expect(persistence.saved.map(({ entity }) => entity)).toEqual([
+          OtpChallengeEntity,
+          OtpDeliveryJobEntity,
+        ]);
+        expect(persistence.saved[0]?.value).toMatchObject({
+          id: result.challengeId,
+          invalidatedAt: expect.any(Date),
+        });
+        expect(persistence.saved[1]?.value).toMatchObject({
+          challengeId: result.challengeId,
+          status: "PENDING",
+          attempts: 0,
+        });
+      }
+    },
+  );
+
+  it("stores only an authenticated ciphertext and challenge hash", async () => {
+    const persistence = persistenceDouble();
+    const sealer = new OtpCodeSealer(pepper);
     const service = new OtpService(
-      dataSource as never,
-      users as never,
-      rateLimiter as never,
-      sms,
-      audit as never,
-      {
-        pepper: "unit-test-otp-pepper-at-least-32-characters",
-        ttlSeconds: 120,
-        resendSeconds: 60,
-      },
-      new MinimumDurationOtpResponseEnvelope(6_000, time, time),
-    );
-
-    const result = await service.request({ phone: "09121234567" }, context);
-
-    expect(result).toEqual({
-      accepted: true,
-      challengeId: expect.any(String),
-      retryAfterSeconds: 60,
-    });
-    expect(rateLimiter.consume).toHaveBeenCalledTimes(3);
-    expect(rateLimiter.consume).toHaveBeenCalledWith(
-      "otp:phone",
-      "+989121234567",
-      { limit: 5, windowSeconds: 600 },
-    );
-    expect(rateLimiter.consume).toHaveBeenCalledWith("otp:ip", "127.0.0.1", {
-      limit: 20,
-      windowSeconds: 600,
-    });
-    expect(rateLimiter.consume).toHaveBeenCalledWith(
-      "otp:resend",
-      "+989121234567",
-      { limit: 1, windowSeconds: 60 },
-    );
-    expect(users.findActiveByPhone).toHaveBeenCalledTimes(1);
-    expect(saved).toHaveLength(foundUser ? 1 : 0);
-    expect(sent).toHaveLength(foundUser ? 1 : 0);
-    expect(time.milliseconds).toBe(6_000);
-    expect(time.sleeps).toEqual([foundUser ? 1_000 : 6_000]);
-  });
-
-  it("keeps a challenge invalid when delivery fails and failure auditing is unavailable", async () => {
-    let persisted: Record<string, unknown> | undefined;
-    const repository = {
-      create: (value: Record<string, unknown>) => value,
-      save: (value: Record<string, unknown>) => {
-        persisted = { ...value };
-        return value;
-      },
-      update: (_criteria: unknown, value: Record<string, unknown>) => {
-        persisted = { ...persisted, ...value };
-      },
-    };
-    const dataSource = {
-      transaction: vi.fn(async (work: (manager: unknown) => unknown) =>
-        work({ getRepository: () => repository }),
-      ),
-    };
-    const time = new VirtualResponseTime();
-    const service = new OtpService(
-      dataSource as never,
+      persistence.dataSource as never,
       {
         findActiveByPhone: vi
           .fn()
           .mockResolvedValue({ id: "6e444c58-63ee-4c74-b39d-f72a5eb84d3f" }),
       } as never,
       { consume: vi.fn().mockResolvedValue(undefined) } as never,
-      {
-        send: async () => {
-          time.milliseconds += 5_000;
-          throw new Error("provider failure detail");
-        },
-      },
-      {
-        write: vi.fn().mockRejectedValue(new Error("audit unavailable")),
-      } as never,
-      {
-        pepper: "unit-test-otp-pepper-at-least-32-characters",
-        ttlSeconds: 120,
-        resendSeconds: 60,
-      },
-      new MinimumDurationOtpResponseEnvelope(6_000, time, time),
-    );
-
-    const response = await service.request({ phone: "09121234567" }, context);
-    expect(response).toEqual({
-      accepted: true,
-      challengeId: expect.any(String),
-      retryAfterSeconds: 60,
-    });
-    expect(persisted).toMatchObject({
-      id: response.challengeId,
-      invalidatedAt: expect.any(Date),
-    });
-    expect(persisted?.invalidatedAt).not.toBeNull();
-    expect(time.milliseconds).toBe(6_000);
-    expect(time.sleeps).toEqual([1_000]);
-  });
-
-  it("leaves the pending challenge invalid when activation fails after accepted delivery", async () => {
-    let persisted: Record<string, unknown> | undefined;
-    const repository = {
-      create: (value: Record<string, unknown>) => value,
-      save: (value: Record<string, unknown>) => {
-        persisted = { ...value };
-        return value;
-      },
-      update: (_criteria: unknown, value: Record<string, unknown>) => {
-        if (value.invalidatedAt === null)
-          throw new Error("database unavailable");
-        persisted = { ...persisted, ...value };
-      },
-    };
-    const time = new VirtualResponseTime();
-    const sent: unknown[] = [];
-    const sms = {
-      send: async (input: unknown) => {
-        time.milliseconds += 5_000;
-        sent.push(input);
-      },
-    };
-    const service = new OtpService(
-      {
-        transaction: vi.fn(async (work: (manager: unknown) => unknown) =>
-          work({ getRepository: () => repository }),
-        ),
-      } as never,
-      {
-        findActiveByPhone: vi
-          .fn()
-          .mockResolvedValue({ id: "6e444c58-63ee-4c74-b39d-f72a5eb84d3f" }),
-      } as never,
-      { consume: vi.fn().mockResolvedValue(undefined) } as never,
-      sms,
-      { write: vi.fn() } as never,
-      {
-        pepper: "unit-test-otp-pepper-at-least-32-characters",
-        ttlSeconds: 120,
-        resendSeconds: 60,
-      },
-      new MinimumDurationOtpResponseEnvelope(6_000, time, time),
-    );
-
-    const response = await service.request({ phone: "09121234567" }, context);
-
-    expect(sent).toHaveLength(1);
-    expect(persisted).toMatchObject({
-      id: response.challengeId,
-      invalidatedAt: expect.any(Date),
-    });
-    expect(persisted?.invalidatedAt).not.toBeNull();
-    expect(time.milliseconds).toBe(6_000);
-    expect(time.sleeps).toEqual([1_000]);
-  });
-
-  it("persists only a hash of the generated code", async () => {
-    let persisted: Record<string, unknown> | undefined;
-    const dataSource = {
-      transaction: vi.fn(async (work: (manager: unknown) => unknown) =>
-        work({
-          getRepository: () => ({
-            create: (value: Record<string, unknown>) => value,
-            save: (value: Record<string, unknown>) => {
-              persisted = { ...value };
-              return value;
-            },
-            update: (_criteria: unknown, value: Record<string, unknown>) => {
-              persisted = { ...persisted, ...value };
-            },
-          }),
-        }),
-      ),
-    };
-    const sms = new FakeSmsProvider();
-    const service = new OtpService(
-      dataSource as never,
-      {
-        findActiveByPhone: vi
-          .fn()
-          .mockResolvedValue({ id: "6e444c58-63ee-4c74-b39d-f72a5eb84d3f" }),
-      } as never,
-      { consume: vi.fn().mockResolvedValue(undefined) } as never,
-      sms,
-      { write: vi.fn() } as never,
-      {
-        pepper: "unit-test-otp-pepper-at-least-32-characters",
-        ttlSeconds: 120,
-        resendSeconds: 60,
-      },
+      options,
+      sealer,
       immediateEnvelope,
     );
 
     const response = await service.request({ phone: "09121234567" }, context);
-    const deliveredCode = sms.sent[0]?.message.match(/\d{6}/)?.[0];
+    const challenge = persistence.saved[0]?.value;
+    const job = persistence.saved[1]?.value;
+    const code = sealer.unseal(
+      {
+        ciphertext: String(job?.codeCiphertext),
+        nonce: String(job?.codeNonce),
+        tag: String(job?.codeTag),
+      },
+      response.challengeId,
+    );
 
-    expect(deliveredCode).toMatch(/^\d{6}$/);
-    expect(JSON.stringify(persisted)).not.toContain(deliveredCode);
-    expect(persisted).toMatchObject({
+    expect(code).toMatch(/^\d{6}$/);
+    expect(challenge).toMatchObject({
       id: response.challengeId,
-      attempts: 0,
       codeHash: expect.stringMatching(/^[a-f\d]{64}$/),
-      invalidatedAt: null,
+      invalidatedAt: expect.any(Date),
     });
+    expect(JSON.stringify(persistence.saved)).not.toContain(code);
   });
 
-  it("keeps the pending challenge invalid and audits a delivery failure", async () => {
-    let persisted: Record<string, unknown> | undefined;
-    const audit = { write: vi.fn().mockResolvedValue(undefined) };
-    const repository = {
-      create: (value: Record<string, unknown>) => value,
-      save: (value: Record<string, unknown>) => {
-        persisted = { ...value };
-        return value;
-      },
-      update: vi.fn(),
-    };
-    const dataSource = {
-      transaction: vi.fn(async (work: (manager: unknown) => unknown) =>
-        work({ getRepository: () => repository }),
-      ),
-    };
+  it("propagates lookup failure as a generic service failure", async () => {
+    const persistence = persistenceDouble();
     const service = new OtpService(
-      dataSource as never,
+      persistence.dataSource as never,
+      {
+        findActiveByPhone: vi
+          .fn()
+          .mockRejectedValue(new Error("database host detail")),
+      } as never,
+      { consume: vi.fn().mockResolvedValue(undefined) } as never,
+      options,
+      new OtpCodeSealer(pepper),
+      immediateEnvelope,
+    );
+    await expect(
+      service.request({ phone: "09121234567" }, context),
+    ).rejects.toMatchObject({ code: "OTP_REQUEST_UNAVAILABLE" });
+    expect(persistence.saved).toHaveLength(0);
+  });
+
+  it("does not accept when the atomic challenge and delivery job transaction fails", async () => {
+    const service = new OtpService(
+      {
+        transaction: vi.fn().mockRejectedValue(new Error("database detail")),
+      } as never,
       {
         findActiveByPhone: vi
           .fn()
           .mockResolvedValue({ id: "6e444c58-63ee-4c74-b39d-f72a5eb84d3f" }),
       } as never,
       { consume: vi.fn().mockResolvedValue(undefined) } as never,
-      {
-        send: async () => {
-          throw new Error("upstream body with bearer-secret");
-        },
-      },
-      audit as never,
-      {
-        pepper: "unit-test-otp-pepper-at-least-32-characters",
-        ttlSeconds: 120,
-        resendSeconds: 60,
-      },
+      options,
+      new OtpCodeSealer(pepper),
       immediateEnvelope,
     );
-
-    const response = await service.request({ phone: "09121234567" }, context);
-    expect(response).toEqual({
-      accepted: true,
-      challengeId: expect.any(String),
-      retryAfterSeconds: 60,
+    await expect(
+      service.request({ phone: "09121234567" }, context),
+    ).rejects.toMatchObject({
+      code: "OTP_REQUEST_UNAVAILABLE",
+      message: "درخواست کد ورود موقتاً در دسترس نیست.",
     });
-    expect(persisted).toMatchObject({ invalidatedAt: expect.any(Date) });
-    expect(repository.update).not.toHaveBeenCalled();
-    expect(audit.write).toHaveBeenCalledWith(
-      expect.objectContaining({
-        action: "auth.otp_delivery_failed",
-        metadata: {},
-      }),
-      expect.anything(),
-    );
-    expect(JSON.stringify(audit.write.mock.calls)).not.toContain(
-      "bearer-secret",
-    );
   });
 
   it("accounts every bucket when the resend bucket rejects", async () => {
     const rateLimiter = {
       consume: vi.fn().mockImplementation(async (scope: string) => {
-        if (scope === "otp:resend") {
+        if (scope === "otp:resend")
           throw Object.assign(new Error("limited"), { code: "RATE_LIMITED" });
-        }
       }),
     };
     const service = new OtpService(
       {} as never,
       { findActiveByPhone: vi.fn() } as never,
       rateLimiter as never,
-      new FakeSmsProvider(),
-      { write: vi.fn() } as never,
-      {
-        pepper: "unit-test-otp-pepper-at-least-32-characters",
-        ttlSeconds: 120,
-        resendSeconds: 60,
-      },
+      options,
+      new OtpCodeSealer(pepper),
       immediateEnvelope,
     );
-
     await expect(
       service.request({ phone: "09121234567" }, context),
     ).rejects.toMatchObject({ code: "RATE_LIMITED" });
@@ -368,41 +216,64 @@ describe("OtpService.request", () => {
   });
 });
 
-describe("MinimumDurationOtpResponseEnvelope", () => {
-  it("waits out the production floor without wall-clock timing", async () => {
+describe("ShortOtpResponseEnvelope", () => {
+  it("uses an injected monotonic clock to add only short padding", async () => {
     const time = new VirtualResponseTime();
-    const envelope = new MinimumDurationOtpResponseEnvelope(
-      OTP_RESPONSE_FLOOR_MILLISECONDS,
+    const envelope = new ShortOtpResponseEnvelope(
+      OTP_RESPONSE_PADDING_MILLISECONDS,
       time,
       time,
     );
-
     const result = await envelope.run(async () => {
-      time.milliseconds += 1_250;
+      time.milliseconds += 25;
       return "accepted";
     });
-
     expect(result).toBe("accepted");
-    expect(time.sleeps).toEqual([4_750]);
-    expect(time.milliseconds).toBe(6_000);
+    expect(time.sleeps).toEqual([50]);
+    expect(time.milliseconds).toBe(75);
   });
 
-  it("settles failed work only after the same production floor", async () => {
+  it("never adds padding after work exceeds the short mask", async () => {
     const time = new VirtualResponseTime();
-    const envelope = new MinimumDurationOtpResponseEnvelope(
-      OTP_RESPONSE_FLOOR_MILLISECONDS,
-      time,
-      time,
-    );
+    const envelope = new ShortOtpResponseEnvelope(75, time, time);
+    await envelope.run(async () => {
+      time.milliseconds += 100;
+    });
+    expect(time.sleeps).toEqual([]);
+    expect(time.milliseconds).toBe(100);
+  });
+});
+
+describe("AuthController", () => {
+  it("maps durable persistence failure to a generic 503 envelope", async () => {
+    const controller = new AuthController({
+      request: vi
+        .fn()
+        .mockRejectedValue(
+          new DomainError(
+            "OTP_REQUEST_UNAVAILABLE",
+            "درخواست کد ورود موقتاً در دسترس نیست.",
+          ),
+        ),
+    } as never);
 
     await expect(
-      envelope.run(async () => {
-        time.milliseconds += 5_000;
-        throw new Error("work failed");
-      }),
-    ).rejects.toThrow("work failed");
-    expect(time.sleeps).toEqual([1_000]);
-    expect(time.milliseconds).toBe(6_000);
+      controller.requestOtp(
+        { phone: "09121234567" },
+        {
+          headers: { "x-request-id": "req_failure" },
+          ip: "127.0.0.1",
+        },
+      ),
+    ).rejects.toMatchObject({
+      status: 503,
+      response: {
+        error: {
+          code: "OTP_REQUEST_UNAVAILABLE",
+          requestId: "req_failure",
+        },
+      },
+    });
   });
 });
 
@@ -427,18 +298,13 @@ describe("RateLimitService", () => {
         }),
       ),
     };
-    const rateLimiter = new RateLimitService(
-      dataSource as never,
-      "unit-test-otp-pepper-at-least-32-characters",
-    );
-
+    const rateLimiter = new RateLimitService(dataSource as never, pepper);
     for (let count = 0; count < 5; count += 1) {
       await rateLimiter.consume("otp:phone", "+989121234567", {
         limit: 5,
         windowSeconds: 600,
       });
     }
-
     await expect(
       rateLimiter.consume("otp:phone", "+989121234567", {
         limit: 5,
@@ -468,11 +334,7 @@ describe("RateLimitService", () => {
         }),
       ),
     };
-    const rateLimiter = new RateLimitService(
-      dataSource as never,
-      "unit-test-otp-pepper-at-least-32-characters",
-    );
-
+    const rateLimiter = new RateLimitService(dataSource as never, pepper);
     await rateLimiter.consume("otp:resend", "+989121234567", {
       limit: 1,
       windowSeconds: 60,
@@ -495,13 +357,11 @@ describe("SMS providers", () => {
       { log: (event: unknown) => structured.push(event) },
       (line) => localLines.push(line),
     );
-
     await provider.send({
       recipient: "+989121234567",
       message: "کد ورود شما: 123456",
       requestId: "req_console",
     });
-
     expect(JSON.stringify(structured)).not.toContain("123456");
     expect(localLines).toEqual(["[DEV OTP] +989121234567 کد ورود شما: 123456"]);
   });
@@ -523,7 +383,6 @@ describe("SMS providers", () => {
       "bearer-secret",
       fetcher,
     );
-
     await expect(
       provider.send({
         recipient: "+989121234567",
