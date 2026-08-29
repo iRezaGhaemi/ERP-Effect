@@ -5,7 +5,10 @@ import { FakeSmsProvider } from "./sms/fake-sms.provider.js";
 import { ConsoleSmsProvider } from "./sms/console-sms.provider.js";
 import { HttpSmsProvider } from "./sms/http-sms.provider.js";
 import { OtpService } from "./otp.service.js";
-import { InProcessOtpBackgroundRunner } from "./otp-background-runner.js";
+import {
+  MinimumDurationOtpResponseEnvelope,
+  OTP_RESPONSE_FLOOR_MILLISECONDS,
+} from "./otp-response-envelope.js";
 import { RateLimitService } from "./rate-limit.service.js";
 
 const context: RequestContext = {
@@ -14,18 +17,21 @@ const context: RequestContext = {
   userAgent: "vitest",
 };
 
-class ControlledBackgroundRunner {
-  readonly tasks: Array<() => Promise<void>> = [];
+class VirtualResponseTime {
+  milliseconds = 0;
+  readonly sleeps: number[] = [];
 
-  schedule(task: () => Promise<void>): void {
-    this.tasks.push(task);
+  nowMilliseconds(): number {
+    return this.milliseconds;
   }
 
-  async runAll(): Promise<void> {
-    const tasks = this.tasks.splice(0);
-    await Promise.all(tasks.map(async (task) => task().catch(() => undefined)));
+  async sleep(milliseconds: number): Promise<void> {
+    this.sleeps.push(milliseconds);
+    this.milliseconds += milliseconds;
   }
 }
+
+const immediateEnvelope = new MinimumDurationOtpResponseEnvelope(0);
 
 describe("OtpService.request", () => {
   it.each([
@@ -33,6 +39,7 @@ describe("OtpService.request", () => {
     ["missing", null],
     ["suspended", null],
   ])("returns the same public shape for %s users", async (_kind, foundUser) => {
+    const time = new VirtualResponseTime();
     const saved: unknown[] = [];
     const dataSource = {
       transaction: vi.fn(async (work: (manager: unknown) => unknown) =>
@@ -50,9 +57,14 @@ describe("OtpService.request", () => {
     };
     const users = { findActiveByPhone: vi.fn().mockResolvedValue(foundUser) };
     const rateLimiter = { consume: vi.fn().mockResolvedValue(undefined) };
-    const sms = new FakeSmsProvider();
+    const sent: unknown[] = [];
+    const sms = {
+      send: async (input: unknown) => {
+        time.milliseconds += 5_000;
+        sent.push(input);
+      },
+    };
     const audit = { write: vi.fn().mockResolvedValue(undefined) };
-    const background = new ControlledBackgroundRunner();
     const service = new OtpService(
       dataSource as never,
       users as never,
@@ -64,7 +76,7 @@ describe("OtpService.request", () => {
         ttlSeconds: 120,
         resendSeconds: 60,
       },
-      background,
+      new MinimumDurationOtpResponseEnvelope(6_000, time, time),
     );
 
     const result = await service.request({ phone: "09121234567" }, context);
@@ -89,16 +101,11 @@ describe("OtpService.request", () => {
       "+989121234567",
       { limit: 1, windowSeconds: 60 },
     );
-    expect(users.findActiveByPhone).not.toHaveBeenCalled();
-    expect(saved).toHaveLength(0);
-    expect(sms.sent).toHaveLength(0);
-    expect(background.tasks).toHaveLength(1);
-
-    await background.runAll();
-
     expect(users.findActiveByPhone).toHaveBeenCalledTimes(1);
     expect(saved).toHaveLength(foundUser ? 1 : 0);
-    expect(sms.sent).toHaveLength(foundUser ? 1 : 0);
+    expect(sent).toHaveLength(foundUser ? 1 : 0);
+    expect(time.milliseconds).toBe(6_000);
+    expect(time.sleeps).toEqual([foundUser ? 1_000 : 6_000]);
   });
 
   it("keeps a challenge invalid when delivery fails and failure auditing is unavailable", async () => {
@@ -118,7 +125,7 @@ describe("OtpService.request", () => {
         work({ getRepository: () => repository }),
       ),
     };
-    const background = new ControlledBackgroundRunner();
+    const time = new VirtualResponseTime();
     const service = new OtpService(
       dataSource as never,
       {
@@ -129,6 +136,7 @@ describe("OtpService.request", () => {
       { consume: vi.fn().mockResolvedValue(undefined) } as never,
       {
         send: async () => {
+          time.milliseconds += 5_000;
           throw new Error("provider failure detail");
         },
       },
@@ -140,7 +148,7 @@ describe("OtpService.request", () => {
         ttlSeconds: 120,
         resendSeconds: 60,
       },
-      background,
+      new MinimumDurationOtpResponseEnvelope(6_000, time, time),
     );
 
     const response = await service.request({ phone: "09121234567" }, context);
@@ -149,15 +157,13 @@ describe("OtpService.request", () => {
       challengeId: expect.any(String),
       retryAfterSeconds: 60,
     });
-    expect(persisted).toBeUndefined();
-
-    await background.runAll();
-
     expect(persisted).toMatchObject({
       id: response.challengeId,
       invalidatedAt: expect.any(Date),
     });
     expect(persisted?.invalidatedAt).not.toBeNull();
+    expect(time.milliseconds).toBe(6_000);
+    expect(time.sleeps).toEqual([1_000]);
   });
 
   it("leaves the pending challenge invalid when activation fails after accepted delivery", async () => {
@@ -174,8 +180,14 @@ describe("OtpService.request", () => {
         persisted = { ...persisted, ...value };
       },
     };
-    const background = new ControlledBackgroundRunner();
-    const sms = new FakeSmsProvider();
+    const time = new VirtualResponseTime();
+    const sent: unknown[] = [];
+    const sms = {
+      send: async (input: unknown) => {
+        time.milliseconds += 5_000;
+        sent.push(input);
+      },
+    };
     const service = new OtpService(
       {
         transaction: vi.fn(async (work: (manager: unknown) => unknown) =>
@@ -195,23 +207,23 @@ describe("OtpService.request", () => {
         ttlSeconds: 120,
         resendSeconds: 60,
       },
-      background,
+      new MinimumDurationOtpResponseEnvelope(6_000, time, time),
     );
 
     const response = await service.request({ phone: "09121234567" }, context);
-    await background.runAll();
 
-    expect(sms.sent).toHaveLength(1);
+    expect(sent).toHaveLength(1);
     expect(persisted).toMatchObject({
       id: response.challengeId,
       invalidatedAt: expect.any(Date),
     });
     expect(persisted?.invalidatedAt).not.toBeNull();
+    expect(time.milliseconds).toBe(6_000);
+    expect(time.sleeps).toEqual([1_000]);
   });
 
   it("persists only a hash of the generated code", async () => {
     let persisted: Record<string, unknown> | undefined;
-    const background = new ControlledBackgroundRunner();
     const dataSource = {
       transaction: vi.fn(async (work: (manager: unknown) => unknown) =>
         work({
@@ -244,11 +256,10 @@ describe("OtpService.request", () => {
         ttlSeconds: 120,
         resendSeconds: 60,
       },
-      background,
+      immediateEnvelope,
     );
 
     const response = await service.request({ phone: "09121234567" }, context);
-    await background.runAll();
     const deliveredCode = sms.sent[0]?.message.match(/\d{6}/)?.[0];
 
     expect(deliveredCode).toMatch(/^\d{6}$/);
@@ -277,7 +288,6 @@ describe("OtpService.request", () => {
         work({ getRepository: () => repository }),
       ),
     };
-    const background = new ControlledBackgroundRunner();
     const service = new OtpService(
       dataSource as never,
       {
@@ -297,7 +307,7 @@ describe("OtpService.request", () => {
         ttlSeconds: 120,
         resendSeconds: 60,
       },
-      background,
+      immediateEnvelope,
     );
 
     const response = await service.request({ phone: "09121234567" }, context);
@@ -306,10 +316,6 @@ describe("OtpService.request", () => {
       challengeId: expect.any(String),
       retryAfterSeconds: 60,
     });
-    expect(audit.write).not.toHaveBeenCalled();
-
-    await background.runAll();
-
     expect(persisted).toMatchObject({ invalidatedAt: expect.any(Date) });
     expect(repository.update).not.toHaveBeenCalled();
     expect(audit.write).toHaveBeenCalledWith(
@@ -332,7 +338,6 @@ describe("OtpService.request", () => {
         }
       }),
     };
-    const background = new ControlledBackgroundRunner();
     const service = new OtpService(
       {} as never,
       { findActiveByPhone: vi.fn() } as never,
@@ -344,7 +349,7 @@ describe("OtpService.request", () => {
         ttlSeconds: 120,
         resendSeconds: 60,
       },
-      background,
+      immediateEnvelope,
     );
 
     await expect(
@@ -360,20 +365,44 @@ describe("OtpService.request", () => {
       limit: 20,
       windowSeconds: 600,
     });
-    expect(background.tasks).toHaveLength(0);
   });
 });
 
-describe("InProcessOtpBackgroundRunner", () => {
-  it("defers delivery work outside the request call stack", async () => {
-    const task = vi.fn().mockResolvedValue(undefined);
-    const runner = new InProcessOtpBackgroundRunner();
+describe("MinimumDurationOtpResponseEnvelope", () => {
+  it("waits out the production floor without wall-clock timing", async () => {
+    const time = new VirtualResponseTime();
+    const envelope = new MinimumDurationOtpResponseEnvelope(
+      OTP_RESPONSE_FLOOR_MILLISECONDS,
+      time,
+      time,
+    );
 
-    runner.schedule(task);
+    const result = await envelope.run(async () => {
+      time.milliseconds += 1_250;
+      return "accepted";
+    });
 
-    expect(task).not.toHaveBeenCalled();
-    await new Promise<void>((resolve) => queueMicrotask(resolve));
-    expect(task).toHaveBeenCalledTimes(1);
+    expect(result).toBe("accepted");
+    expect(time.sleeps).toEqual([4_750]);
+    expect(time.milliseconds).toBe(6_000);
+  });
+
+  it("settles failed work only after the same production floor", async () => {
+    const time = new VirtualResponseTime();
+    const envelope = new MinimumDurationOtpResponseEnvelope(
+      OTP_RESPONSE_FLOOR_MILLISECONDS,
+      time,
+      time,
+    );
+
+    await expect(
+      envelope.run(async () => {
+        time.milliseconds += 5_000;
+        throw new Error("work failed");
+      }),
+    ).rejects.toThrow("work failed");
+    expect(time.sleeps).toEqual([1_000]);
+    expect(time.milliseconds).toBe(6_000);
   });
 });
 

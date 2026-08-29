@@ -1,7 +1,8 @@
 import { RequestOtpResponseSchema } from "@effect/auth/contracts";
 import {
   AUTH_OPTIONS,
-  OTP_BACKGROUND_RUNNER,
+  MinimumDurationOtpResponseEnvelope,
+  OTP_RESPONSE_ENVELOPE,
   SMS_PROVIDER,
 } from "@effect/auth/server";
 import { entityRegistry } from "@effect-erp/database";
@@ -22,19 +23,6 @@ import { CreateOtp202608280006 } from "../../../packages/platform/database/src/m
 
 const sources: DataSource[] = [];
 let app: INestApplication | undefined;
-
-class ControlledBackgroundRunner {
-  readonly tasks: Array<() => Promise<void>> = [];
-
-  schedule(task: () => Promise<void>): void {
-    this.tasks.push(task);
-  }
-
-  async runAll(): Promise<void> {
-    const tasks = this.tasks.splice(0);
-    await Promise.all(tasks.map(async (task) => task().catch(() => undefined)));
-  }
-}
 
 afterEach(async () => {
   if (app) await app.close();
@@ -72,14 +60,13 @@ describe("OTP request API", () => {
         ["+989121234567", "+989121234568"],
       );
       const sent: unknown[] = [];
-      const background = new ControlledBackgroundRunner();
       const module = await Test.createTestingModule({ imports: [AppModule] })
         .overrideProvider(DataSource)
         .useValue(source)
         .overrideProvider(SMS_PROVIDER)
         .useValue({ send: async (input: unknown) => sent.push(input) })
-        .overrideProvider(OTP_BACKGROUND_RUNNER)
-        .useValue(background)
+        .overrideProvider(OTP_RESPONSE_ENVELOPE)
+        .useValue(new MinimumDurationOtpResponseEnvelope(0))
         .overrideProvider(AUTH_OPTIONS)
         .useValue({
           pepper: "e2e-test-otp-pepper-at-least-32-characters",
@@ -110,12 +97,11 @@ describe("OTP request API", () => {
           "retryAfterSeconds",
         ]);
       }
-      expect(sent).toHaveLength(0);
-      expect(background.tasks).toHaveLength(3);
-
-      await background.runAll();
-
       expect(sent).toHaveLength(1);
+      const [{ count }] = await source.query<Array<{ count: string }>>(
+        `SELECT COUNT(*)::text AS count FROM otp_challenges`,
+      );
+      expect(count).toBe("1");
     } finally {
       await Promise.all(sources.splice(0).map((source) => source.destroy()));
       await container.stop();

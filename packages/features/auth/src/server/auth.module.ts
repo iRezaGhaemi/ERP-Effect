@@ -7,9 +7,9 @@ import { AUTH_OPTIONS } from "./auth.options.js";
 import { AuthController } from "./auth.controller.js";
 import { OtpService } from "./otp.service.js";
 import {
-  InProcessOtpBackgroundRunner,
-  OTP_BACKGROUND_RUNNER,
-} from "./otp-background-runner.js";
+  MinimumDurationOtpResponseEnvelope,
+  OTP_RESPONSE_ENVELOPE,
+} from "./otp-response-envelope.js";
 import { RateLimitService } from "./rate-limit.service.js";
 import { ConsoleSmsProvider } from "./sms/console-sms.provider.js";
 import { FakeSmsProvider } from "./sms/fake-sms.provider.js";
@@ -63,8 +63,8 @@ function loadEnv() {
       },
     },
     {
-      provide: OTP_BACKGROUND_RUNNER,
-      useClass: InProcessOtpBackgroundRunner,
+      provide: OTP_RESPONSE_ENVELOPE,
+      useFactory: () => new MinimumDurationOtpResponseEnvelope(),
     },
     RateLimitService,
     OtpService,
@@ -72,7 +72,7 @@ function loadEnv() {
   exports: [
     AUTH_OPTIONS,
     SMS_PROVIDER,
-    OTP_BACKGROUND_RUNNER,
+    OTP_RESPONSE_ENVELOPE,
     RateLimitService,
     OtpService,
   ],

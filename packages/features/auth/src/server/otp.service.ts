@@ -14,9 +14,9 @@ import {
 import { OtpChallengeEntity } from "../entities/index.js";
 import { AUTH_OPTIONS, type AuthOptions } from "./auth.options.js";
 import {
-  OTP_BACKGROUND_RUNNER,
-  type OtpBackgroundRunner,
-} from "./otp-background-runner.js";
+  OTP_RESPONSE_ENVELOPE,
+  type OtpResponseEnvelope,
+} from "./otp-response-envelope.js";
 import { RateLimitService } from "./rate-limit.service.js";
 import { SMS_PROVIDER, type SmsProvider } from "./sms/sms-provider.js";
 
@@ -29,8 +29,8 @@ export class OtpService {
     @Inject(SMS_PROVIDER) private readonly sms: SmsProvider,
     private readonly auditWriter: AuditWriter,
     @Inject(AUTH_OPTIONS) private readonly options: AuthOptions,
-    @Inject(OTP_BACKGROUND_RUNNER)
-    private readonly backgroundRunner: OtpBackgroundRunner,
+    @Inject(OTP_RESPONSE_ENVELOPE)
+    private readonly responseEnvelope: OtpResponseEnvelope,
   ) {}
 
   async request(
@@ -59,10 +59,16 @@ export class OtpService {
     if (rejected) throw rejected.reason;
 
     const challengeId = randomUUID();
-    this.backgroundRunner.schedule(() =>
-      this.deliverActiveChallenge(challengeId, phone, context),
-    );
-    return this.accepted(challengeId);
+    return this.responseEnvelope.run(async () => {
+      try {
+        await this.deliverActiveChallenge(challengeId, phone, context);
+      } catch {
+        // Accepted responses deliberately conceal membership and infrastructure state.
+        // A failure before the pending save sends no SMS; a later failure leaves the
+        // already committed challenge invalid.
+      }
+      return this.accepted(challengeId);
+    });
   }
 
   private async deliverActiveChallenge(
@@ -107,11 +113,15 @@ export class OtpService {
       return;
     }
 
-    await this.dataSource.transaction(async (manager) => {
-      await manager
-        .getRepository(OtpChallengeEntity)
-        .update({ id: challengeId }, { invalidatedAt: null });
-    });
+    try {
+      await this.dataSource.transaction(async (manager) => {
+        await manager
+          .getRepository(OtpChallengeEntity)
+          .update({ id: challengeId }, { invalidatedAt: null });
+      });
+    } catch {
+      // Delivery may have been accepted, but an unconfirmed activation must fail closed.
+    }
   }
 
   private accepted(challengeId: string): RequestOtpResponse {

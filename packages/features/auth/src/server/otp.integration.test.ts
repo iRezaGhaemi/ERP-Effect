@@ -11,24 +11,12 @@ import { HardenAuditLogBoundary202608280004 } from "../../../../platform/databas
 import { CreateAccessControl202608280005 } from "../../../../platform/database/src/migrations/202608280005-create-access-control.js";
 import { CreateOtp202608280006 } from "../../../../platform/database/src/migrations/202608280006-create-otp.js";
 import { entityRegistry } from "../../../../platform/database/src/entity-registry.js";
+import { MinimumDurationOtpResponseEnvelope } from "./otp-response-envelope.js";
 import { OtpService } from "./otp.service.js";
 import { RateLimitService } from "./rate-limit.service.js";
 import { FakeSmsProvider } from "./sms/fake-sms.provider.js";
 
 const dataSources: DataSource[] = [];
-
-class ControlledBackgroundRunner {
-  readonly tasks: Array<() => Promise<void>> = [];
-
-  schedule(task: () => Promise<void>): void {
-    this.tasks.push(task);
-  }
-
-  async runAll(): Promise<void> {
-    const tasks = this.tasks.splice(0);
-    await Promise.all(tasks.map(async (task) => task().catch(() => undefined)));
-  }
-}
 
 afterEach(async () => {
   await Promise.all(dataSources.splice(0).map((source) => source.destroy()));
@@ -103,7 +91,6 @@ describe("OTP request persistence", () => {
         ["+989121234567", "کاربر", "فعال"],
       );
       const sms = new FakeSmsProvider();
-      const background = new ControlledBackgroundRunner();
       const pepper = "integration-otp-pepper-at-least-32-characters";
       const limiter = new RateLimitService(database.runtime, pepper);
       const service = new OtpService(
@@ -113,7 +100,7 @@ describe("OTP request persistence", () => {
         sms,
         new AuditWriter(database.runtime),
         { pepper, ttlSeconds: 120, resendSeconds: 60 },
-        background,
+        new MinimumDurationOtpResponseEnvelope(0),
       );
 
       const response = await service.request(
@@ -124,13 +111,11 @@ describe("OTP request persistence", () => {
           userAgent: "vitest",
         },
       );
-      const [{ count: beforeCount }] = await database.runtime.query<
+      const [{ count }] = await database.runtime.query<
         Array<{ count: string }>
       >(`SELECT COUNT(*)::text AS count FROM otp_challenges`);
-      expect(beforeCount).toBe("0");
-      expect(sms.sent).toHaveLength(0);
-
-      await background.runAll();
+      expect(count).toBe("1");
+      expect(sms.sent).toHaveLength(1);
 
       const code = sms.sent[0]?.message.match(/\d{6}/)?.[0];
       const [challenge] = await database.runtime.query<
@@ -193,7 +178,6 @@ describe("OTP request persistence", () => {
     const database = await prepareDatabase();
     try {
       const pepper = "integration-otp-pepper-at-least-32-characters";
-      const background = new ControlledBackgroundRunner();
       const service = new OtpService(
         database.runtime,
         new UsersFacade(database.runtime),
@@ -201,7 +185,7 @@ describe("OTP request persistence", () => {
         new FakeSmsProvider(),
         new AuditWriter(database.runtime),
         { pepper, ttlSeconds: 120, resendSeconds: 60 },
-        background,
+        new MinimumDurationOtpResponseEnvelope(0),
       );
       const requestContext = {
         requestId: "req_resend",
@@ -230,7 +214,6 @@ describe("OTP request persistence", () => {
         { scope: "otp:phone", requestCount: 2 },
         { scope: "otp:resend", requestCount: 2 },
       ]);
-      expect(background.tasks).toHaveLength(1);
     } finally {
       await database.stop();
     }
@@ -246,7 +229,6 @@ describe("OTP request persistence", () => {
         ["+989121234567", "کاربر", "فعال"],
       );
       const pepper = "integration-otp-pepper-at-least-32-characters";
-      const background = new ControlledBackgroundRunner();
       const service = new OtpService(
         database.runtime,
         new UsersFacade(database.runtime),
@@ -258,7 +240,7 @@ describe("OTP request persistence", () => {
         },
         new AuditWriter(database.runtime),
         { pepper, ttlSeconds: 120, resendSeconds: 60 },
-        background,
+        new MinimumDurationOtpResponseEnvelope(0),
       );
 
       const response = await service.request(
@@ -274,8 +256,6 @@ describe("OTP request persistence", () => {
         challengeId: expect.any(String),
         retryAfterSeconds: 60,
       });
-
-      await background.runAll();
 
       const [challenge] = await database.runtime.query<
         Array<{ invalidatedAt: Date; userId: string }>
