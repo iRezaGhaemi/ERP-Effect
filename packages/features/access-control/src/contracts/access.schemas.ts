@@ -22,15 +22,15 @@ export const RoleDtoSchema = z.object({
   slug: z.string(),
   isSystem: z.boolean(),
   permissionKeys: z.array(z.string()),
-  createdAt: z.date(),
-  updatedAt: z.date(),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
 });
 export const PermissionDtoSchema = z.object({
   id: z.uuid(),
   resource: z.string(),
   action: z.string(),
   key: z.string(),
-  createdAt: z.date(),
+  createdAt: z.iso.datetime(),
 });
 export const RolePageSchema = createPageSchema(RoleDtoSchema);
 export const PermissionPageSchema = createPageSchema(PermissionDtoSchema);
@@ -61,6 +61,8 @@ export const ReplacePermissionOverridesSchema = z.object({
 export type PermissionKey = z.infer<typeof PermissionKeySchema>;
 export type PermissionEffect = z.infer<typeof PermissionEffectSchema>;
 export type AccessPageQuery = z.infer<typeof AccessPageQuerySchema>;
+export type RoleDto = z.infer<typeof RoleDtoSchema>;
+export type PermissionDto = z.infer<typeof PermissionDtoSchema>;
 export type CreateRoleInput = z.input<typeof CreateRoleSchema>;
 export type UpdateRoleInput = z.input<typeof UpdateRoleSchema>;
 export type ReplacePermissionOverridesInput = z.input<

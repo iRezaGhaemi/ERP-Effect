@@ -65,9 +65,33 @@ describe("access control persistence", () => {
       await runtime.initialize();
       await seedInitialAccess(runtime, "۰۹۱۲۱۲۳۴۵۶۷");
       await seedInitialAccess(runtime, "09121234567");
+      await runtime.query(
+        `UPDATE permissions SET resource = 'wrong', action = 'wrong' WHERE key = 'users:read'`,
+      );
+      await runtime.query(
+        `UPDATE roles SET name = 'نام خراب' WHERE slug = 'super-admin'`,
+      );
+      await runtime.query(
+        `DELETE FROM role_permissions
+         WHERE role_id = (SELECT id FROM roles WHERE slug = 'super-admin')
+           AND permission_id = (SELECT id FROM permissions WHERE key = 'users:read')`,
+      );
+      await runtime.query(
+        `INSERT INTO permissions (resource, action, key)
+         VALUES ('reports', 'export', 'reports:export')`,
+      );
+      await runtime.query(
+        `INSERT INTO role_permissions (role_id, permission_id)
+         SELECT role.id, permission.id FROM roles role, permissions permission
+         WHERE role.slug = 'super-admin' AND permission.key = 'reports:export'`,
+      );
+      await seedInitialAccess(runtime, "09121234567");
+      await seedInitialAccess(runtime, "09121234567");
       const [[roles], [permissions], [users], [grants]] = await Promise.all([
         runtime.query(`SELECT COUNT(*)::int AS count FROM roles`),
-        runtime.query(`SELECT COUNT(*)::int AS count FROM permissions`),
+        runtime.query(
+          `SELECT COUNT(*)::int AS count FROM permissions WHERE key <> 'reports:export'`,
+        ),
         runtime.query(
           `SELECT COUNT(*)::int AS count FROM users WHERE phone = '+989121234567'`,
         ),
@@ -79,6 +103,29 @@ describe("access control persistence", () => {
         users.count,
         grants.count,
       ]).toEqual([1, 7, 1, 7]);
+      const [
+        [repairedPermission],
+        [repairedRole],
+        [repairAudit],
+        [extraGrant],
+      ] = await Promise.all([
+        runtime.query(
+          `SELECT resource, action FROM permissions WHERE key = 'users:read'`,
+        ),
+        runtime.query(`SELECT name FROM roles WHERE slug = 'super-admin'`),
+        runtime.query(
+          `SELECT COUNT(*)::int AS count FROM audit_logs WHERE action = 'seed.access_control_repaired'`,
+        ),
+        runtime.query(
+          `SELECT COUNT(*)::int AS count FROM role_permissions role_permission
+             INNER JOIN permissions permission ON permission.id = role_permission.permission_id
+             WHERE permission.key = 'reports:export'`,
+        ),
+      ]);
+      expect(repairedPermission).toEqual({ resource: "users", action: "read" });
+      expect(repairedRole.name).toBe("مدیر ارشد");
+      expect(repairAudit.count).toBe(1);
+      expect(extraGrant.count).toBe(0);
     } finally {
       await Promise.all(sources.splice(0).map((source) => source.destroy()));
       await container.stop();

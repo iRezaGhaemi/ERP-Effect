@@ -10,6 +10,8 @@ import {
   UpdateUserSchema,
   type CreateUserInput,
   type UpdateUserInput,
+  type UserDetailDto,
+  type UserDto,
   type UserPageQuery,
 } from "../contracts/index.js";
 import { UserEntity, UserStatus } from "../entities/index.js";
@@ -26,6 +28,19 @@ function isPostgresUniqueViolation(error: unknown): boolean {
 
 function requestId(): string {
   return `domain_${randomUUID()}`;
+}
+
+function toUserDto(user: UserEntity): UserDto {
+  return {
+    id: user.id,
+    phone: user.phone,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    status: user.status,
+    lastLoginAt: user.lastLoginAt?.toISOString() ?? null,
+    createdAt: user.createdAt.toISOString(),
+    updatedAt: user.updatedAt.toISOString(),
+  };
 }
 
 @Injectable()
@@ -55,7 +70,7 @@ export class UsersService {
     input: CreateUserInput,
     actorId: string,
     manager?: EntityManager,
-  ): Promise<UserEntity> {
+  ): Promise<UserDto> {
     const values = CreateUserSchema.parse(input);
     try {
       const work = async (transactionManager: EntityManager) => {
@@ -80,7 +95,7 @@ export class UsersService {
           },
           transactionManager,
         );
-        return user;
+        return toUserDto(user);
       };
       return manager
         ? await work(manager)
@@ -95,7 +110,7 @@ export class UsersService {
     }
   }
 
-  async list(query: UserPageQuery): Promise<Page<UserEntity>> {
+  async list(query: UserPageQuery): Promise<Page<UserDto>> {
     const [items, total] = await this.dataSource.manager
       .getRepository(UserEntity)
       .findAndCount({
@@ -104,24 +119,37 @@ export class UsersService {
         take: query.pageSize,
       });
     return {
-      items,
+      items: items.map(toUserDto),
       meta: { ...query, total, pageCount: Math.ceil(total / query.pageSize) },
     };
   }
 
-  async get(id: string): Promise<UserEntity> {
-    const user = await this.dataSource.manager
-      .getRepository(UserEntity)
-      .findOneBy({ id });
+  async get(id: string): Promise<UserDetailDto> {
+    const manager = this.dataSource.manager;
+    const user = await manager.getRepository(UserEntity).findOneBy({ id });
     if (!user) throw new DomainError("USER_NOT_FOUND", "کاربر پیدا نشد.");
-    return user;
+    const [roles, permissionOverrides] = await Promise.all([
+      manager.query<Array<{ roleId: string }>>(
+        `SELECT role_id AS "roleId" FROM user_roles WHERE user_id = $1 ORDER BY role_id`,
+        [id],
+      ),
+      manager.query<Array<{ permissionId: string; effect: "ALLOW" | "DENY" }>>(
+        `SELECT permission_id AS "permissionId", effect FROM user_permission_overrides WHERE user_id = $1 ORDER BY permission_id`,
+        [id],
+      ),
+    ]);
+    return {
+      ...toUserDto(user),
+      roleIds: roles.map(({ roleId }) => roleId),
+      permissionOverrides,
+    };
   }
 
   async update(
     id: string,
     input: UpdateUserInput,
     actorId: string,
-  ): Promise<UserEntity> {
+  ): Promise<UserDto> {
     const values = UpdateUserSchema.parse(input);
     try {
       return await this.dataSource.transaction(async (manager) => {
@@ -148,7 +176,7 @@ export class UsersService {
           },
           manager,
         );
-        return saved;
+        return toUserDto(saved);
       });
     } catch (error) {
       if (isPostgresUniqueViolation(error))
@@ -164,7 +192,7 @@ export class UsersService {
     id: string,
     status: UserStatus,
     actorId: string,
-  ): Promise<UserEntity> {
+  ): Promise<UserDto> {
     return this.dataSource.transaction(async (manager) => {
       await manager.query(
         `SELECT pg_advisory_xact_lock(hashtextextended('active-super-admin', 0))`,
@@ -213,7 +241,7 @@ export class UsersService {
         },
         manager,
       );
-      return saved;
+      return toUserDto(saved);
     });
   }
 }

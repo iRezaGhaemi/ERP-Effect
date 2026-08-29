@@ -13,8 +13,10 @@ import {
   type AccessPageQuery,
   type CreateRoleInput,
   type PermissionEffect as PermissionEffectValue,
+  type PermissionDto,
   type PermissionKey,
   type ReplacePermissionOverridesInput,
+  type RoleDto,
   type UpdateRoleInput,
 } from "../contracts/index.js";
 import {
@@ -140,6 +142,41 @@ function auditRequestId(): string {
   return `domain_${randomUUID()}`;
 }
 
+function toRoleDto(role: RoleEntity, permissionKeys: string[]): RoleDto {
+  return {
+    id: role.id,
+    name: role.name,
+    slug: role.slug,
+    isSystem: role.isSystem,
+    permissionKeys,
+    createdAt: role.createdAt.toISOString(),
+    updatedAt: role.updatedAt.toISOString(),
+  };
+}
+
+function toPermissionDto(permission: PermissionEntity): PermissionDto {
+  return {
+    id: permission.id,
+    resource: permission.resource,
+    action: permission.action,
+    key: permission.key,
+    createdAt: permission.createdAt.toISOString(),
+  };
+}
+
+async function rolePermissionKeys(
+  roleId: string,
+  manager: EntityManager,
+): Promise<string[]> {
+  const rows = await manager.query<Array<{ key: string }>>(
+    `SELECT permission.key FROM role_permissions role_permission
+     INNER JOIN permissions permission ON permission.id = role_permission.permission_id
+     WHERE role_permission.role_id = $1 ORDER BY permission.key`,
+    [roleId],
+  );
+  return rows.map(({ key }) => key);
+}
+
 @Injectable()
 export class AccessControlService {
   constructor(
@@ -170,9 +207,7 @@ export class AccessControlService {
     return [...effective].sort();
   }
 
-  async listRoles(
-    query: AccessPageQuery,
-  ): Promise<Page<Record<string, unknown>>> {
+  async listRoles(query: AccessPageQuery): Promise<Page<RoleDto>> {
     const repository = this.dataSource.manager.getRepository(RoleEntity);
     const [roles, total] = await repository.findAndCount({
       order: { createdAt: "ASC", id: "ASC" },
@@ -181,15 +216,8 @@ export class AccessControlService {
     });
     const items = await Promise.all(
       roles.map(async (role) => {
-        const keys = await this.dataSource.manager.query<
-          Array<{ key: string }>
-        >(
-          `SELECT permission.key FROM role_permissions role_permission
-           INNER JOIN permissions permission ON permission.id = role_permission.permission_id
-           WHERE role_permission.role_id = $1 ORDER BY permission.key`,
-          [role.id],
-        );
-        return { ...role, permissionKeys: keys.map(({ key }) => key) };
+        const keys = await rolePermissionKeys(role.id, this.dataSource.manager);
+        return toRoleDto(role, keys);
       }),
     );
     return {
@@ -198,9 +226,7 @@ export class AccessControlService {
     };
   }
 
-  async listPermissions(
-    query: AccessPageQuery,
-  ): Promise<Page<PermissionEntity>> {
+  async listPermissions(query: AccessPageQuery): Promise<Page<PermissionDto>> {
     const [items, total] = await this.dataSource.manager
       .getRepository(PermissionEntity)
       .findAndCount({
@@ -209,39 +235,30 @@ export class AccessControlService {
         take: query.pageSize,
       });
     return {
-      items,
+      items: items.map(toPermissionDto),
       meta: { ...query, total, pageCount: Math.ceil(total / query.pageSize) },
     };
   }
 
-  async createRole(
-    input: CreateRoleInput,
-    actorId: string,
-  ): Promise<RoleEntity> {
+  async createRole(input: CreateRoleInput, actorId: string): Promise<RoleDto> {
     const values = CreateRoleSchema.parse(input);
     try {
       return await this.dataSource.transaction(async (manager) => {
         await this.assertPermissionsExist(values.permissionIds, manager);
-        const role = await manager
-          .getRepository(RoleEntity)
-          .save(
-            manager
-              .getRepository(RoleEntity)
-              .create({
-                name: values.name,
-                slug: values.slug,
-                isSystem: false,
-              }),
-          );
+        const role = await manager.getRepository(RoleEntity).save(
+          manager.getRepository(RoleEntity).create({
+            name: values.name,
+            slug: values.slug,
+            isSystem: false,
+          }),
+        );
         if (values.permissionIds.length) {
-          await manager
-            .getRepository(RolePermissionEntity)
-            .insert(
-              values.permissionIds.map((permissionId) => ({
-                roleId: role.id,
-                permissionId,
-              })),
-            );
+          await manager.getRepository(RolePermissionEntity).insert(
+            values.permissionIds.map((permissionId) => ({
+              roleId: role.id,
+              permissionId,
+            })),
+          );
         }
         await this.auditWriter.write(
           {
@@ -255,7 +272,7 @@ export class AccessControlService {
           },
           manager,
         );
-        return role;
+        return toRoleDto(role, await rolePermissionKeys(role.id, manager));
       });
     } catch (error) {
       if (isUniqueViolation(error))
@@ -271,7 +288,7 @@ export class AccessControlService {
     id: string,
     input: UpdateRoleInput,
     actorId: string,
-  ): Promise<RoleEntity> {
+  ): Promise<RoleDto> {
     const values = UpdateRoleSchema.parse(input);
     try {
       return await this.dataSource.transaction(async (manager) => {
@@ -287,20 +304,24 @@ export class AccessControlService {
             "نقش سیستمی قابل تغییر شناسه نیست.",
           );
         }
+        if (role.isSystem && values.permissionIds !== undefined) {
+          throw new DomainError(
+            "SYSTEM_ROLE_PROTECTED",
+            "مجوزهای نقش سیستمی قابل تغییر نیست.",
+          );
+        }
         if (values.permissionIds) {
           await this.assertPermissionsExist(values.permissionIds, manager);
           await manager
             .getRepository(RolePermissionEntity)
             .delete({ roleId: id });
           if (values.permissionIds.length) {
-            await manager
-              .getRepository(RolePermissionEntity)
-              .insert(
-                values.permissionIds.map((permissionId) => ({
-                  roleId: id,
-                  permissionId,
-                })),
-              );
+            await manager.getRepository(RolePermissionEntity).insert(
+              values.permissionIds.map((permissionId) => ({
+                roleId: id,
+                permissionId,
+              })),
+            );
           }
         }
         if (values.name !== undefined) role.name = values.name;
@@ -318,7 +339,7 @@ export class AccessControlService {
           },
           manager,
         );
-        return saved;
+        return toRoleDto(saved, await rolePermissionKeys(saved.id, manager));
       });
     } catch (error) {
       if (isUniqueViolation(error))
@@ -369,12 +390,10 @@ export class AccessControlService {
       await manager.query(
         `SELECT pg_advisory_xact_lock(hashtextextended('active-super-admin', 0))`,
       );
-      const user = await manager
-        .getRepository(UserEntity)
-        .findOne({
-          where: { id: userId },
-          lock: { mode: "pessimistic_write" },
-        });
+      const user = await manager.getRepository(UserEntity).findOne({
+        where: { id: userId },
+        lock: { mode: "pessimistic_write" },
+      });
       if (!user) throw new DomainError("USER_NOT_FOUND", "کاربر پیدا نشد.");
       const roles = uniqueRoleIds.length
         ? await manager
@@ -449,15 +468,13 @@ export class AccessControlService {
         .getRepository(UserPermissionOverrideEntity)
         .delete({ userId });
       if (overrides.length) {
-        await manager
-          .getRepository(UserPermissionOverrideEntity)
-          .insert(
-            overrides.map(({ permissionId, effect }) => ({
-              userId,
-              permissionId,
-              effect: effect as PermissionEffect,
-            })),
-          );
+        await manager.getRepository(UserPermissionOverrideEntity).insert(
+          overrides.map(({ permissionId, effect }) => ({
+            userId,
+            permissionId,
+            effect: effect as PermissionEffect,
+          })),
+        );
       }
       await this.auditWriter.write(
         {

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { createPageSchema } from "@effect-erp/contracts";
 
 const persianDigits = "۰۱۲۳۴۵۶۷۸۹";
 const arabicDigits = "٠١٢٣٤٥٦٧٨٩";
@@ -34,5 +35,30 @@ export const UserPageQuerySchema = z.object({
   pageSize: z.coerce.number().int().positive().max(100).default(20),
 });
 
+export const UserDtoSchema = z.object({
+  id: z.uuid(),
+  phone: z.string().min(1),
+  firstName: z.string(),
+  lastName: z.string(),
+  status: z.enum(["ACTIVE", "SUSPENDED"]),
+  lastLoginAt: z.iso.datetime().nullable(),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
+});
+export const UserPermissionOverrideDtoSchema = z.object({
+  permissionId: z.uuid(),
+  effect: z.enum(["ALLOW", "DENY"]),
+});
+export const UserDetailDtoSchema = UserDtoSchema.extend({
+  roleIds: z.array(z.uuid()),
+  permissionOverrides: z.array(UserPermissionOverrideDtoSchema),
+});
+export const UserPageSchema = createPageSchema(UserDtoSchema);
+
 export type UpdateUserInput = z.input<typeof UpdateUserSchema>;
 export type UserPageQuery = z.infer<typeof UserPageQuerySchema>;
+export type UserDto = z.infer<typeof UserDtoSchema>;
+export type UserDetailDto = z.infer<typeof UserDetailDtoSchema>;
+export type UserPermissionOverrideDto = z.infer<
+  typeof UserPermissionOverrideDtoSchema
+>;

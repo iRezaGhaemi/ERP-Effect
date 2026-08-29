@@ -14,8 +14,10 @@ export {
 export type {
   AccessPageQuery,
   CreateRoleInput,
+  PermissionDto,
   PermissionEffect,
   PermissionKey,
   ReplacePermissionOverridesInput,
+  RoleDto,
   UpdateRoleInput,
 } from "./access.schemas.js";

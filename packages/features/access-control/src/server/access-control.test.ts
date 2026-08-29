@@ -5,6 +5,8 @@ import { UserStatus, type UserEntity } from "@effect/users/entities";
 import { UsersService } from "@effect/users/server";
 import { describe, expect, it, vi } from "vitest";
 
+import { RoleEntity } from "../entities/index.js";
+import { AccessControlController } from "./access-control.controller.js";
 import {
   AccessControlService,
   type AccessControlRepository,
@@ -28,6 +30,41 @@ function createResolver(overrides: Partial<AccessControlRepository> = {}) {
       repository as never,
       {} as never,
       {} as never,
+    ),
+  };
+}
+
+function createSystemRoleService() {
+  const role = Object.assign(new RoleEntity(), {
+    id: randomUUID(),
+    name: "مدیر ارشد",
+    slug: "super-admin",
+    isSystem: true,
+    createdAt: new Date("2026-08-28T00:00:00.000Z"),
+    updatedAt: new Date("2026-08-28T00:00:00.000Z"),
+  });
+  const manager = {
+    getRepository: vi.fn((entity: { name: string }) => {
+      if (entity.name === "RoleEntity") {
+        return {
+          findOne: vi.fn().mockResolvedValue(role),
+          save: vi.fn().mockResolvedValue(role),
+        };
+      }
+      if (entity.name === "RolePermissionEntity") {
+        return { delete: vi.fn(), insert: vi.fn() };
+      }
+      return {};
+    }),
+  };
+  const dataSource = { transaction: vi.fn(async (work) => work(manager)) };
+  const { repository } = createResolver();
+  return {
+    role,
+    service: new AccessControlService(
+      repository as never,
+      dataSource as never,
+      { write: vi.fn() } as never,
     ),
   };
 }
@@ -133,6 +170,45 @@ describe("last active super-admin protection", () => {
       service.replaceUserRoles(userId, [], actorId),
     ).rejects.toMatchObject({
       code: "LAST_ACTIVE_SUPER_ADMIN",
+    });
+  });
+});
+
+describe("system role protection", () => {
+  it("rejects replacing the super-admin permission set", async () => {
+    const { role, service } = createSystemRoleService();
+
+    await expect(
+      service.updateRole(role.id, { permissionIds: [] }, actorId),
+    ).rejects.toMatchObject({ code: "SYSTEM_ROLE_PROTECTED" });
+  });
+
+  it("maps a super-admin permission replacement to a 422 API error", async () => {
+    const { role, service } = createSystemRoleService();
+    const controller = new AccessControlController(service);
+
+    await expect(
+      controller.updateRole(
+        role.id,
+        { permissionIds: [] },
+        {
+          user: {
+            userId: actorId,
+            sessionId: randomUUID(),
+            phone: "+989000000000",
+            permissions: ["roles:manage"],
+          },
+          headers: { "x-request-id": "req_system_role" },
+        },
+      ),
+    ).rejects.toMatchObject({
+      status: 422,
+      response: {
+        error: {
+          code: "SYSTEM_ROLE_PROTECTED",
+          requestId: "req_system_role",
+        },
+      },
     });
   });
 });

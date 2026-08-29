@@ -1,9 +1,20 @@
 import type { AuthenticatedPrincipal } from "@effect-erp/contracts";
 import {
+  PermissionPageSchema,
+  RoleDtoSchema,
+  RolePageSchema,
+} from "@effect/access-control/contracts";
+import {
   AccessControlService,
   PermissionGuard,
 } from "@effect/access-control/server";
+import { AuditLogPageSchema } from "@effect/audit/contracts";
 import { entityRegistry, seedInitialAccess } from "@effect-erp/database";
+import {
+  UserDetailDtoSchema,
+  UserDtoSchema,
+  UserPageSchema,
+} from "@effect/users/contracts";
 import { startPostgresContainer } from "@effect-erp/testing";
 import {
   CanActivate,
@@ -25,12 +36,10 @@ import { CreateAccessControl202608280005 } from "../../../packages/platform/data
 
 class TestingPermissionGuard extends PermissionGuard implements CanActivate {
   override async canActivate(context: ExecutionContext): Promise<boolean> {
-    const requestObject = context
-      .switchToHttp()
-      .getRequest<{
-        headers: Record<string, string>;
-        user?: AuthenticatedPrincipal;
-      }>();
+    const requestObject = context.switchToHttp().getRequest<{
+      headers: Record<string, string>;
+      user?: AuthenticatedPrincipal;
+    }>();
     const userId = requestObject.headers["x-test-user-id"];
     if (userId)
       requestObject.user = {
@@ -116,15 +125,67 @@ describe("access-control API", () => {
       app.setGlobalPrefix("api/v1");
       await app.init();
 
-      await request(app.getHttpServer())
+      const roles = await request(app.getHttpServer())
+        .get("/api/v1/roles")
+        .set("x-test-user-id", adminId)
+        .expect(200);
+      expect(() => RolePageSchema.parse(roles.body)).not.toThrow();
+      const superAdmin = roles.body.items.find(
+        (role: { slug: string }) => role.slug === "super-admin",
+      );
+      const protectedUpdate = await request(app.getHttpServer())
+        .patch(`/api/v1/roles/${superAdmin.id}`)
+        .set("x-test-user-id", adminId)
+        .send({ permissionIds: [] })
+        .expect(422);
+      expect(protectedUpdate.body.error.code).toBe("SYSTEM_ROLE_PROTECTED");
+
+      const permissions = await request(app.getHttpServer())
+        .get("/api/v1/permissions")
+        .set("x-test-user-id", adminId)
+        .expect(200);
+      expect(() => PermissionPageSchema.parse(permissions.body)).not.toThrow();
+      const readPermission = permissions.body.items.find(
+        (permission: { key: string }) => permission.key === "users:read",
+      );
+      const createdRole = await request(app.getHttpServer())
+        .post("/api/v1/roles")
+        .set("x-test-user-id", adminId)
+        .send({
+          name: "اپراتور",
+          slug: "operator",
+          permissionIds: [readPermission.id],
+        })
+        .expect(201);
+      expect(RoleDtoSchema.parse(createdRole.body).permissionKeys).toEqual([
+        "users:read",
+      ]);
+      const updatedRole = await request(app.getHttpServer())
+        .patch(`/api/v1/roles/${createdRole.body.id}`)
+        .set("x-test-user-id", adminId)
+        .send({ name: "اپراتور ارشد" })
+        .expect(200);
+      expect(RoleDtoSchema.parse(updatedRole.body).name).toBe("اپراتور ارشد");
+
+      const users = await request(app.getHttpServer())
         .get("/api/v1/users")
         .set("x-test-user-id", adminId)
         .expect(200);
+      expect(() => UserPageSchema.parse(users.body)).not.toThrow();
       const created = await request(app.getHttpServer())
         .post("/api/v1/users")
         .set("x-test-user-id", adminId)
         .send({ phone: "09123334444", firstName: "کاربر", lastName: "محدود" })
         .expect(201);
+      expect(() => UserDtoSchema.parse(created.body)).not.toThrow();
+      const detail = await request(app.getHttpServer())
+        .get(`/api/v1/users/${created.body.id}`)
+        .set("x-test-user-id", adminId)
+        .expect(200);
+      expect(UserDetailDtoSchema.parse(detail.body)).toMatchObject({
+        roleIds: [],
+        permissionOverrides: [],
+      });
       await request(app.getHttpServer())
         .get("/api/v1/users")
         .set("x-test-user-id", created.body.id)
@@ -146,6 +207,11 @@ describe("access-control API", () => {
         `SELECT COUNT(*)::text AS count FROM audit_logs WHERE action IN ('users.created', 'users.permission_overrides_replaced')`,
       );
       expect(Number(count)).toBeGreaterThanOrEqual(2);
+      const auditLogs = await request(app.getHttpServer())
+        .get("/api/v1/audit-logs")
+        .set("x-test-user-id", adminId)
+        .expect(200);
+      expect(() => AuditLogPageSchema.parse(auditLogs.body)).not.toThrow();
     } finally {
       await Promise.all(sources.splice(0).map((source) => source.destroy()));
       await container.stop();

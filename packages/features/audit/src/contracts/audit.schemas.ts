@@ -1,3 +1,4 @@
+import { createPageSchema } from "@effect-erp/contracts";
 import { z } from "zod";
 
 export const AuditEventSchema = z.object({
@@ -17,8 +18,9 @@ export const AuditQuerySchema = z.object({
 
 export const AuditLogDtoSchema = AuditEventSchema.extend({
   id: z.uuid(),
-  createdAt: z.date(),
+  createdAt: z.iso.datetime(),
 });
+export const AuditLogPageSchema = createPageSchema(AuditLogDtoSchema);
 
 export type AuditEvent = z.infer<typeof AuditEventSchema>;
 export type AuditQuery = z.infer<typeof AuditQuerySchema>;

@@ -219,9 +219,7 @@ describe("audit services", () => {
 
     const page = await service.list({ page: 2, pageSize: 250 });
 
-    expect(page.items[0]?.createdAt).toEqual(
-      new Date("2026-08-28T00:00:00.000Z"),
-    );
+    expect(page.items[0]?.createdAt).toBe("2026-08-28T00:00:00.000Z");
     expect(page.meta).toEqual({
       page: 2,
       pageSize: 100,

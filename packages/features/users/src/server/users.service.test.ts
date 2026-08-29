@@ -90,14 +90,98 @@ describe("users service", () => {
       { write: vi.fn() } as never,
     );
     const facade = new UsersFacade({ manager } as never);
-    const user = await service.create(
+    await service.create(
       { phone: "09121234567", firstName: "رضا", lastName: "قایمی" },
       actorId,
       manager,
     );
-    user.status = UserStatus.SUSPENDED;
+    const stored = await facade.findActiveByPhone("09121234567", manager);
+    expect(stored).not.toBeNull();
+    stored!.status = UserStatus.SUSPENDED;
 
     expect(await facade.findActiveByPhone("09121234567", manager)).toBeNull();
     expect(await facade.findActiveByPhone("09129999999", manager)).toBeNull();
+  });
+
+  it("returns JSON-wire user summaries from list", async () => {
+    const user = Object.assign(new UserEntity(), {
+      id: "013a40c7-82e7-4435-a5d6-988b03fdce37",
+      phone: "+989121234567",
+      firstName: "رضا",
+      lastName: "قایمی",
+      status: UserStatus.ACTIVE,
+      lastLoginAt: new Date("2026-08-28T01:00:00.000Z"),
+      createdAt: new Date("2026-08-28T00:00:00.000Z"),
+      updatedAt: new Date("2026-08-28T02:00:00.000Z"),
+    });
+    const service = new UsersService(
+      {
+        manager: {
+          getRepository: () => ({
+            findAndCount: vi.fn().mockResolvedValue([[user], 1]),
+          }),
+        },
+      } as never,
+      { write: vi.fn() } as never,
+    );
+
+    await expect(service.list({ page: 1, pageSize: 20 })).resolves.toEqual({
+      items: [
+        {
+          id: user.id,
+          phone: user.phone,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          status: "ACTIVE",
+          lastLoginAt: "2026-08-28T01:00:00.000Z",
+          createdAt: "2026-08-28T00:00:00.000Z",
+          updatedAt: "2026-08-28T02:00:00.000Z",
+        },
+      ],
+      meta: { page: 1, pageSize: 20, total: 1, pageCount: 1 },
+    });
+  });
+
+  it("returns role assignments and explicit overrides in user detail", async () => {
+    const user = Object.assign(new UserEntity(), {
+      id: "013a40c7-82e7-4435-a5d6-988b03fdce37",
+      phone: "+989121234567",
+      firstName: "رضا",
+      lastName: "قایمی",
+      status: UserStatus.ACTIVE,
+      lastLoginAt: null,
+      createdAt: new Date("2026-08-28T00:00:00.000Z"),
+      updatedAt: new Date("2026-08-28T02:00:00.000Z"),
+    });
+    const roleId = "8be4f7bd-ce15-4679-a721-ca557fac79e9";
+    const permissionId = "0f4ee796-6148-42c0-802a-55409f226f50";
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce([{ roleId }])
+      .mockResolvedValueOnce([{ permissionId, effect: "DENY" }]);
+    const service = new UsersService(
+      {
+        manager: {
+          query,
+          getRepository: () => ({
+            findOneBy: vi.fn().mockResolvedValue(user),
+          }),
+        },
+      } as never,
+      { write: vi.fn() } as never,
+    );
+
+    await expect(service.get(user.id)).resolves.toEqual({
+      id: user.id,
+      phone: user.phone,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      status: "ACTIVE",
+      lastLoginAt: null,
+      createdAt: "2026-08-28T00:00:00.000Z",
+      updatedAt: "2026-08-28T02:00:00.000Z",
+      roleIds: [roleId],
+      permissionOverrides: [{ permissionId, effect: "DENY" }],
+    });
   });
 });

@@ -21,7 +21,7 @@ function toAuditLogDto(log: AuditLogEntity): AuditLogDto {
     metadata: log.metadata,
     ipAddress: log.ipAddress,
     requestId: log.requestId,
-    createdAt: log.createdAt,
+    createdAt: log.createdAt.toISOString(),
   };
 }
 
