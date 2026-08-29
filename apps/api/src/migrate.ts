@@ -1,14 +1,11 @@
 import "reflect-metadata";
 
+import { parseMigrationEnv } from "@effect-erp/config";
 import { createDataSource } from "@effect-erp/database";
 
-const url = process.env.DATABASE_URL;
+const { DATABASE_MIGRATION_URL } = parseMigrationEnv(process.env);
 
-if (url === undefined) {
-  throw new Error("DATABASE_URL is required for migrations.");
-}
-
-const dataSource = createDataSource({ url });
+const dataSource = createDataSource({ url: DATABASE_MIGRATION_URL });
 
 try {
   await dataSource.initialize();

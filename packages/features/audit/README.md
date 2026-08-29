@@ -14,6 +14,13 @@ PostgreSQL administrators and migration credentials remain trusted: like every d
 they can replace the functions, triggers, role memberships, or table ownership. They must never be
 used by the running application or exposed through `DATABASE_URL`.
 
+Audit metadata uses a conservative, case/separator-normalized key-name deny policy for common
+tokens, codes, credentials, phone data, secrets, cookies, passwords, JWT/bearer fields, and private
+or API key forms. It does not inspect values and does not claim arbitrary-value secret detection.
+Action-specific event schemas may impose stricter allowlists or additional field restrictions.
+
 The development Compose topology provisions `effect_migrator` for the one-shot migration service
-and `effect` for the API. Existing development volumes created by the earlier single-superuser
-topology must be recreated or have their roles corrected before the startup check will accept them.
+and `effect` for the API. The migration entrypoint requires `DATABASE_MIGRATION_URL` and never falls
+back to the API's `DATABASE_URL`. Existing development volumes created by the earlier
+single-superuser topology must be recreated or have their roles corrected before the startup check
+will accept them.

@@ -20,7 +20,7 @@ services:
       dockerfile: apps/api/Dockerfile
     command: ["node", "dist/migrate.js"]
     environment:
-      DATABASE_URL: postgres://effect_migrator:effect-migrator-development@postgres:5432/effect_erp
+      DATABASE_MIGRATION_URL: postgres://effect_migrator:effect-migrator-development@postgres:5432/effect_erp
     depends_on:
       postgres:
         condition: service_healthy

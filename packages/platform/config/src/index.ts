@@ -1,2 +1,7 @@
-export { AppEnvSchema, parseEnv } from './env.js';
-export type { AppEnv } from './env.js';
+export {
+  AppEnvSchema,
+  MigrationEnvSchema,
+  parseEnv,
+  parseMigrationEnv,
+} from "./env.js";
+export type { AppEnv, MigrationEnv } from "./env.js";

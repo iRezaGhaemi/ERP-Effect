@@ -1,3 +1,9 @@
+/**
+ * Conservative key-name policy for metadata shared across audit actions.
+ *
+ * Keys are normalized for case and separators before matching. This does not inspect values or
+ * claim to detect arbitrary secrets; action-specific schemas may reject additional fields.
+ */
 const sensitiveKeyFragments = [
   "token",
   "code",
@@ -11,6 +17,16 @@ const sensitiveKeyFragments = [
   "otp",
   "password",
   "secret",
+  "jwt",
+  "bearer",
+  "apikey",
+  "privatekey",
+  "signingkey",
+  "encryptionkey",
+  "decryptionkey",
+  "accesskey",
+  "jwk",
+  "pem",
 ] as const;
 
 const invalidAuditMetadataError = "Invalid audit metadata.";

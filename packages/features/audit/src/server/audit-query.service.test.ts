@@ -88,6 +88,15 @@ describe("audit services", () => {
       { mobile: "+989121234567" },
       { msisdn: "+989121234567" },
       { tele_phone: "+989121234567" },
+      { jwt: "signed-token" },
+      { apiKey: "api-key" },
+      { private_key: "private-key" },
+      { bearer: "bearer-credential" },
+      { signingKey: "signing-key" },
+      { encryption_key: "encryption-key" },
+      { accessKey: "access-key" },
+      { jwk: "json-web-key" },
+      { pem: "pem-encoded-key" },
     ];
 
     for (const metadata of sensitiveMetadata) {
