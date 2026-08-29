@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "pnpm --filter @effect-erp/config build && pnpm --filter @effect-erp/contracts build && pnpm --filter @effect/audit build && pnpm --filter @effect/users build && pnpm --filter @effect/access-control build && pnpm --filter @effect-erp/database build && pnpm --filter @effect-erp/logger build && tsc -p tsconfig.json",
+    "build": "pnpm --filter @effect-erp/config build && pnpm --filter @effect-erp/contracts build && pnpm --filter @effect/audit build && pnpm --filter @effect/users build && pnpm --filter @effect/access-control build && pnpm --filter @effect/auth build && pnpm --filter @effect-erp/database build && pnpm --filter @effect-erp/logger build && tsc -p tsconfig.json",
     "dev": "tsx watch src/main.ts",
     "migrate": "node dist/migrate.js",
     "seed": "node dist/seed.js",
@@ -14,6 +14,7 @@
     "test:runtime": "pnpm run build && node test/runtime-smoke.mjs"
   },
   "dependencies": {
+    "@effect/auth": "workspace:*",
     "@effect/access-control": "workspace:*",
     "@effect/audit": "workspace:*",
     "@effect-erp/config": "workspace:*",

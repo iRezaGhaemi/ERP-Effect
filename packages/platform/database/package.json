@@ -27,6 +27,10 @@
     "./migrations/202608280005-create-access-control": {
       "types": "./dist/migrations/202608280005-create-access-control.d.ts",
       "default": "./dist/migrations/202608280005-create-access-control.js"
+    },
+    "./migrations/202608280006-create-otp": {
+      "types": "./dist/migrations/202608280006-create-otp.d.ts",
+      "default": "./dist/migrations/202608280006-create-otp.js"
     }
   },
   "scripts": {
@@ -35,6 +39,7 @@
     "test": "vitest run --config vitest.config.ts"
   },
   "dependencies": {
+    "@effect/auth": "workspace:*",
     "@effect/access-control": "workspace:*",
     "@effect/audit": "workspace:*",
     "@effect/users": "workspace:*",
