@@ -10,6 +10,7 @@ import { HardenAuditLogBoundary202608280004 } from "./migrations/202608280004-ha
 import { CreateAccessControl202608280005 } from "./migrations/202608280005-create-access-control.js";
 import { CreateOtp202608280006 } from "./migrations/202608280006-create-otp.js";
 import { CreateOtpDeliveryOutbox202608280007 } from "./migrations/202608280007-create-otp-delivery-outbox.js";
+import { HardenOtpDeliveryOutbox202608280008 } from "./migrations/202608280008-harden-otp-delivery-outbox.js";
 
 export type DatabaseOptions = {
   url: string;
@@ -28,6 +29,7 @@ export function createDataSource(options: DatabaseOptions): DataSource {
       CreateAccessControl202608280005,
       CreateOtp202608280006,
       CreateOtpDeliveryOutbox202608280007,
+      HardenOtpDeliveryOutbox202608280008,
     ],
     synchronize: false,
   });

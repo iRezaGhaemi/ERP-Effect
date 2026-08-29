@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { CreateOtp202608280006 } from "../../../../platform/database/src/migrations/202608280006-create-otp.js";
 import { CreateOtpDeliveryOutbox202608280007 } from "../../../../platform/database/src/migrations/202608280007-create-otp-delivery-outbox.js";
+import { HardenOtpDeliveryOutbox202608280008 } from "../../../../platform/database/src/migrations/202608280008-harden-otp-delivery-outbox.js";
 
 describe("OTP migration 006", () => {
   it("creates challenge and hashed bucket boundaries with the next free migration number", async () => {
@@ -54,5 +55,40 @@ describe("OTP delivery outbox migration 007", () => {
     expect(sql).toContain('"ix_otp_delivery_jobs_ready"');
     expect(sql).toContain('"ix_otp_delivery_jobs_lease_expires_at"');
     expect(sql).not.toContain("123456");
+  });
+});
+
+describe("OTP delivery hardening migration 008", () => {
+  it("adds decoy, fenced lease, audit-pending, erasure, and cleanup boundaries", async () => {
+    const queries: string[] = [];
+    const runner = {
+      query: async (sql: string) => {
+        queries.push(sql);
+      },
+    } as unknown as QueryRunner;
+    const migration = new HardenOtpDeliveryOutbox202608280008();
+
+    await migration.up(runner);
+    await migration.down(runner);
+
+    const sql = queries.join("\n");
+    expect(migration.name).toBe("HardenOtpDeliveryOutbox202608280008");
+    expect(sql).toContain('ALTER TABLE "otp_challenges" ADD "is_decoy"');
+    expect(sql).toContain(
+      'ALTER TABLE "otp_challenges" ALTER COLUMN "user_id" DROP NOT NULL',
+    );
+    expect(sql).toContain('CONSTRAINT "CK_otp_challenges_decoy_user"');
+    expect(sql).toContain(`'AUDIT_PENDING'`);
+    expect(sql).toContain(`'DISCARDED'`);
+    expect(sql).toContain('ADD "lease_token" uuid');
+    expect(sql).toContain('ADD "claim_version" integer NOT NULL DEFAULT 0');
+    expect(sql).toContain('"code_ciphertext" DROP NOT NULL');
+    expect(sql).toContain(
+      'CONSTRAINT "CK_otp_delivery_jobs_ciphertext_null_or_valid"',
+    );
+    expect(sql).toContain('"ix_otp_delivery_jobs_cleanup"');
+    expect(sql).toContain('DROP CONSTRAINT "CK_otp_delivery_jobs_status"');
+    expect(sql).toContain('DROP COLUMN "lease_token"');
+    expect(sql).toContain('ALTER COLUMN "user_id" SET NOT NULL');
   });
 });

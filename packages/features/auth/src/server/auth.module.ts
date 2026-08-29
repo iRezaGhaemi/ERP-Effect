@@ -79,7 +79,10 @@ function loadEnv() {
         enabled: loadEnv().NODE_ENV !== "test",
         pollMilliseconds: 250,
         leaseSeconds: 30,
+        providerTimeoutMarginSeconds: 5,
         maxAttempts: 3,
+        terminalRetentionSeconds: 86_400,
+        cleanupBatchSize: 500,
       }),
     },
     {

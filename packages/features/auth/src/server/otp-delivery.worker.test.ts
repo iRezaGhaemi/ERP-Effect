@@ -12,11 +12,16 @@ import {
 const pepper = "unit-test-otp-pepper-at-least-32-characters";
 const challengeId = "a879495d-0ac8-4490-9f1c-5535671b9acf";
 const jobId = "22fc14a5-14a9-4ace-97b5-363aa2d69091";
+const leaseToken = "bb99bb08-0c46-4c81-81e2-fce0056e21a1";
+const claimVersion = 7;
 const options: OtpDeliveryWorkerOptions = {
   enabled: false,
   pollMilliseconds: 10_000,
   leaseSeconds: 30,
+  providerTimeoutMarginSeconds: 5,
   maxAttempts: 3,
+  terminalRetentionSeconds: 86_400,
+  cleanupBatchSize: 500,
 };
 
 function claimedJob(attempts = 1) {
@@ -29,8 +34,21 @@ function claimedJob(attempts = 1) {
     codeTag: sealed.tag,
     requestId: "req_worker",
     attempts,
+    leaseToken,
+    claimVersion,
+    expiresAt: new Date(Date.now() + 120_000),
     recipient: "+989121234567",
     requestIp: "127.0.0.1",
+  };
+}
+
+function auditPendingJob() {
+  return {
+    ...claimedJob(3),
+    status: "AUDIT_PENDING",
+    codeCiphertext: null,
+    codeNonce: null,
+    codeTag: null,
   };
 }
 
@@ -85,19 +103,34 @@ describe("OtpDeliveryWorker", () => {
     expect(sms.send).toHaveBeenCalledWith({
       recipient: "+989121234567",
       message: "کد ورود شما: 123456",
-      requestId: "req_worker",
+      requestId: jobId,
     });
     expect(database.claimQuery.mock.calls[0]?.[0]).toContain(
       "FOR UPDATE SKIP LOCKED",
     );
+    expect(database.claimQuery.mock.calls[0]?.[0]).toContain(`"lease_token"`);
+    expect(database.claimQuery.mock.calls[0]?.[0]).toContain(
+      `"claim_version" = job."claim_version" + 1`,
+    );
     expect(database.claimQuery.mock.calls[0]?.[0]).toContain(
       `"status" = 'PROCESSING' AND "lease_expires_at" <= now()`,
+    );
+    expect(database.claimQuery.mock.calls[0]?.[0]).toContain(
+      `job."lease_token" AS "leaseToken"`,
+    );
+    expect(database.claimQuery.mock.calls[0]?.[0]).toContain(
+      `job."claim_version" AS "claimVersion"`,
     );
     expect(database.completionQuery.mock.calls[0]?.[1]).toEqual([challengeId]);
     expect(database.completionQuery.mock.calls[1]?.[1]).toEqual([
       jobId,
       challengeId,
+      leaseToken,
+      claimVersion,
     ]);
+    expect(database.completionQuery.mock.calls[1]?.[0]).toContain(
+      `"code_ciphertext" = NULL`,
+    );
   });
 
   it("schedules a bounded retry after a transient provider failure", async () => {
@@ -105,7 +138,7 @@ describe("OtpDeliveryWorker", () => {
     const transaction = vi.fn(async (work) =>
       work({ query: vi.fn().mockResolvedValue([job]) }),
     );
-    const query = vi.fn().mockResolvedValue([]);
+    const query = vi.fn().mockResolvedValue([{ id: jobId }]);
     const worker = new OtpDeliveryWorker(
       { transaction, query } as never,
       { send: vi.fn().mockRejectedValue(new Error("provider secret")) },
@@ -117,7 +150,15 @@ describe("OtpDeliveryWorker", () => {
     await worker.runOnce();
 
     expect(query.mock.calls[0]?.[0]).toContain(`"status" = 'PENDING'`);
-    expect(query.mock.calls[0]?.[1]).toEqual([jobId, 1, challengeId]);
+    expect(query.mock.calls[0]?.[0]).toContain(`"lease_token" = $4`);
+    expect(query.mock.calls[0]?.[0]).toContain(`"claim_version" = $5`);
+    expect(query.mock.calls[0]?.[1]).toEqual([
+      jobId,
+      1,
+      challengeId,
+      leaseToken,
+      claimVersion,
+    ]);
   });
 
   it("leaves the challenge invalid and audits safe metadata on terminal failure", async () => {
@@ -128,9 +169,12 @@ describe("OtpDeliveryWorker", () => {
       .fn()
       .mockImplementationOnce(async (work) => work({ query: claimQuery }))
       .mockImplementationOnce(async (work) =>
-        work({ marker: "audit-manager" }),
+        work({
+          marker: "audit-manager",
+          query: vi.fn().mockResolvedValue([{ id: jobId }]),
+        }),
       );
-    const query = vi.fn().mockResolvedValue([]);
+    const query = vi.fn().mockResolvedValue([{ id: jobId }]);
     const worker = new OtpDeliveryWorker(
       { transaction, query } as never,
       { send: vi.fn().mockRejectedValue(new Error("provider secret")) },
@@ -141,7 +185,8 @@ describe("OtpDeliveryWorker", () => {
 
     await worker.runOnce();
 
-    expect(query.mock.calls[0]?.[0]).toContain(`"status" = 'FAILED'`);
+    expect(query.mock.calls[0]?.[0]).toContain(`"status" = 'AUDIT_PENDING'`);
+    expect(query.mock.calls[0]?.[0]).toContain(`"code_ciphertext" = NULL`);
     expect(query.mock.calls[0]?.[0]).not.toContain("otp_challenges");
     expect(audit.write).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -149,7 +194,7 @@ describe("OtpDeliveryWorker", () => {
         entityId: challengeId,
         metadata: {},
       }),
-      { marker: "audit-manager" },
+      expect.objectContaining({ marker: "audit-manager" }),
     );
     expect(JSON.stringify(audit.write.mock.calls)).not.toContain(
       "provider secret",
@@ -166,8 +211,10 @@ describe("OtpDeliveryWorker", () => {
       .mockImplementationOnce(async (work) =>
         work({ query: vi.fn().mockResolvedValue([job]) }),
       )
-      .mockImplementationOnce(async (work) => work({}));
-    const query = vi.fn().mockResolvedValue([]);
+      .mockImplementationOnce(async (work) =>
+        work({ query: vi.fn().mockResolvedValue([{ id: jobId }]) }),
+      );
+    const query = vi.fn().mockResolvedValue([{ id: jobId }]);
     const sms = { send: vi.fn() };
     const worker = new OtpDeliveryWorker(
       { transaction, query } as never,
@@ -180,7 +227,7 @@ describe("OtpDeliveryWorker", () => {
     await worker.runOnce();
 
     expect(sms.send).not.toHaveBeenCalled();
-    expect(query.mock.calls[0]?.[0]).toContain(`"status" = 'FAILED'`);
+    expect(query.mock.calls[0]?.[0]).toContain(`"status" = 'AUDIT_PENDING'`);
   });
 
   it("does not activate a mismatched challenge after accepted delivery", async () => {
@@ -194,8 +241,10 @@ describe("OtpDeliveryWorker", () => {
       .mockImplementationOnce(async (work) =>
         work({ query: vi.fn().mockResolvedValue([]) }),
       )
-      .mockImplementationOnce(async (work) => work({}));
-    const query = vi.fn().mockResolvedValue([]);
+      .mockImplementationOnce(async (work) =>
+        work({ query: vi.fn().mockResolvedValue([{ id: jobId }]) }),
+      );
+    const query = vi.fn().mockResolvedValue([{ id: jobId }]);
     const sms = { send: vi.fn().mockResolvedValue(undefined) };
     const worker = new OtpDeliveryWorker(
       { transaction, query } as never,
@@ -208,7 +257,7 @@ describe("OtpDeliveryWorker", () => {
     await worker.runOnce();
 
     expect(sms.send).toHaveBeenCalledTimes(1);
-    expect(query.mock.calls[0]?.[0]).toContain(`"status" = 'FAILED'`);
+    expect(query.mock.calls[0]?.[0]).toContain(`"status" = 'AUDIT_PENDING'`);
     expect(audit.write).toHaveBeenCalledWith(
       expect.objectContaining({ entityId: challengeId, metadata: {} }),
       expect.anything(),
@@ -226,7 +275,7 @@ describe("OtpDeliveryWorker", () => {
         work({ query: vi.fn().mockResolvedValue([job]) }),
       )
       .mockImplementationOnce(async (work) => work({}));
-    const query = vi.fn().mockResolvedValue([]);
+    const query = vi.fn().mockResolvedValue([{ id: jobId }]);
     const worker = new OtpDeliveryWorker(
       { transaction, query } as never,
       { send: vi.fn().mockRejectedValue(new Error("provider secret")) },
@@ -236,32 +285,117 @@ describe("OtpDeliveryWorker", () => {
     );
 
     await expect(worker.runOnce()).resolves.toBe(true);
-    expect(query.mock.calls[0]?.[0]).toContain(`"status" = 'FAILED'`);
+    expect(query.mock.calls[0]?.[0]).toContain(`"status" = 'AUDIT_PENDING'`);
+    expect(query.mock.calls[0]?.[0]).toContain(`"code_ciphertext" = NULL`);
     expect(warning).toHaveBeenCalledWith(
       "OTP terminal delivery audit could not be persisted.",
     );
     warning.mockRestore();
   });
 
+  it("retries audit-pending terminalization without invoking the provider", async () => {
+    const job = auditPendingJob();
+    const audit = { write: vi.fn().mockResolvedValue(undefined) };
+    const finalizeQuery = vi.fn().mockResolvedValue([{ id: jobId }]);
+    const transaction = vi
+      .fn()
+      .mockImplementationOnce(async (work) =>
+        work({ query: vi.fn().mockResolvedValue([]) }),
+      )
+      .mockImplementationOnce(async (work) =>
+        work({ query: vi.fn().mockResolvedValue([job]) }),
+      )
+      .mockImplementationOnce(async (work) => work({ query: finalizeQuery }));
+    const sms = { send: vi.fn() };
+    const worker = new OtpDeliveryWorker(
+      { transaction, query: vi.fn() } as never,
+      sms,
+      audit as never,
+      new OtpCodeSealer(pepper),
+      options,
+    );
+
+    await expect(worker.runOnce()).resolves.toBe(true);
+
+    expect(sms.send).not.toHaveBeenCalled();
+    expect(audit.write).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "auth.otp_delivery_failed",
+        entityId: challengeId,
+        requestId: "req_worker",
+      }),
+      expect.anything(),
+    );
+    expect(finalizeQuery.mock.calls[0]?.[0]).toContain(`"status" = 'FAILED'`);
+    expect(finalizeQuery.mock.calls[0]?.[0]).toContain(`"lease_token" = $3`);
+    expect(finalizeQuery.mock.calls[0]?.[1]).toEqual([
+      jobId,
+      challengeId,
+      leaseToken,
+      claimVersion,
+    ]);
+  });
+
+  it("terminalizes nearly expired jobs before calling the provider", async () => {
+    const job = {
+      ...claimedJob(),
+      expiresAt: new Date(Date.now() + 1_000),
+    };
+    const transaction = vi
+      .fn()
+      .mockImplementationOnce(async (work) =>
+        work({ query: vi.fn().mockResolvedValue([job]) }),
+      )
+      .mockImplementationOnce(async (work) =>
+        work({ query: vi.fn().mockResolvedValue([{ id: jobId }]) }),
+      );
+    const query = vi.fn().mockResolvedValue([{ id: jobId }]);
+    const sms = { send: vi.fn() };
+    const worker = new OtpDeliveryWorker(
+      { transaction, query } as never,
+      sms,
+      { write: vi.fn().mockResolvedValue(undefined) } as never,
+      new OtpCodeSealer(pepper),
+      options,
+    );
+
+    await worker.runOnce();
+
+    expect(sms.send).not.toHaveBeenCalled();
+    expect(query.mock.calls[0]?.[0]).toContain(`"status" = 'AUDIT_PENDING'`);
+  });
+
   it("allows only a claimed job to be delivered across concurrent workers", async () => {
     const job = claimedJob();
     const claims = [job, null];
     const claim = vi.fn(async () => claims.shift());
-    const makeSource = () => ({
-      transaction: vi.fn(async (work) => {
-        const candidate = await claim();
-        if (!candidate) return work({ query: vi.fn().mockResolvedValue([]) });
-        let queryCount = 0;
-        return work({
-          query: vi.fn().mockImplementation(() => {
-            queryCount += 1;
-            if (queryCount === 1) return [candidate];
-            return [{ id: queryCount === 2 ? challengeId : jobId }];
-          }),
-        });
-      }),
-      query: vi.fn(),
-    });
+    const makeSource = () => {
+      let attemptedDeliveryClaim = false;
+      let claimedDelivery = false;
+      return {
+        transaction: vi.fn(async (work) => {
+          if (!attemptedDeliveryClaim) {
+            attemptedDeliveryClaim = true;
+            const candidate = await claim();
+            claimedDelivery = Boolean(candidate);
+            return work({
+              query: vi.fn().mockResolvedValue(candidate ? [candidate] : []),
+            });
+          }
+          if (!claimedDelivery) {
+            return work({ query: vi.fn().mockResolvedValue([]) });
+          }
+          let queryCount = 0;
+          return work({
+            query: vi.fn().mockImplementation(() => {
+              queryCount += 1;
+              return [{ id: queryCount === 1 ? challengeId : jobId }];
+            }),
+          });
+        }),
+        query: vi.fn(),
+      };
+    };
     const sms = { send: vi.fn().mockResolvedValue(undefined) };
     const workers = [makeSource(), makeSource()].map(
       (source) =>
@@ -305,5 +439,24 @@ describe("OtpDeliveryWorker", () => {
     await shutdown;
     expect(stopped).toBe(true);
     expect(database.source.transaction).toHaveBeenCalledTimes(2);
+  });
+
+  it("cleans up expired terminal challenges and jobs in bounded batches", async () => {
+    const query = vi.fn().mockResolvedValue([{ deletedCount: "2" }]);
+    const worker = new OtpDeliveryWorker(
+      { transaction: vi.fn(), query } as never,
+      { send: vi.fn() },
+      { write: vi.fn() } as never,
+      new OtpCodeSealer(pepper),
+      options,
+    );
+
+    await expect(worker.cleanupTerminalRows()).resolves.toBe(2);
+
+    expect(query.mock.calls[0]?.[0]).toContain(
+      `"status" IN ('SUCCEEDED', 'FAILED', 'DISCARDED')`,
+    );
+    expect(query.mock.calls[0]?.[0]).toContain(`LIMIT $2`);
+    expect(query.mock.calls[0]?.[1]).toEqual([86_400, 500]);
   });
 });

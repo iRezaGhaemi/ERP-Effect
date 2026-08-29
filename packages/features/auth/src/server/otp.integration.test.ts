@@ -11,6 +11,7 @@ import { HardenAuditLogBoundary202608280004 } from "../../../../platform/databas
 import { CreateAccessControl202608280005 } from "../../../../platform/database/src/migrations/202608280005-create-access-control.js";
 import { CreateOtp202608280006 } from "../../../../platform/database/src/migrations/202608280006-create-otp.js";
 import { CreateOtpDeliveryOutbox202608280007 } from "../../../../platform/database/src/migrations/202608280007-create-otp-delivery-outbox.js";
+import { HardenOtpDeliveryOutbox202608280008 } from "../../../../platform/database/src/migrations/202608280008-harden-otp-delivery-outbox.js";
 import { entityRegistry } from "../../../../platform/database/src/entity-registry.js";
 import { OtpCodeSealer } from "./otp-code-sealer.js";
 import { OtpDeliveryWorker } from "./otp-delivery.worker.js";
@@ -46,6 +47,7 @@ async function prepareDatabase(): Promise<{
       CreateAccessControl202608280005,
       CreateOtp202608280006,
       CreateOtpDeliveryOutbox202608280007,
+      HardenOtpDeliveryOutbox202608280008,
     ],
     synchronize: false,
   });
@@ -147,7 +149,10 @@ describe("OTP request persistence", () => {
           enabled: false,
           pollMilliseconds: 1,
           leaseSeconds: 30,
+          providerTimeoutMarginSeconds: 5,
           maxAttempts: 3,
+          terminalRetentionSeconds: 86_400,
+          cleanupBatchSize: 500,
         },
       );
       await worker.runOnce();
@@ -244,7 +249,10 @@ describe("OTP request persistence", () => {
         enabled: false,
         pollMilliseconds: 1,
         leaseSeconds: 30,
+        providerTimeoutMarginSeconds: 5,
         maxAttempts: 3,
+        terminalRetentionSeconds: 86_400,
+        cleanupBatchSize: 500,
       };
       const firstWorker = new OtpDeliveryWorker(
         database.runtime,
@@ -383,7 +391,10 @@ describe("OTP request persistence", () => {
           enabled: false,
           pollMilliseconds: 1,
           leaseSeconds: 30,
+          providerTimeoutMarginSeconds: 5,
           maxAttempts: 1,
+          terminalRetentionSeconds: 86_400,
+          cleanupBatchSize: 500,
         },
       );
       await worker.runOnce();

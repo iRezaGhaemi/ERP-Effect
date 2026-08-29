@@ -86,22 +86,74 @@ describe("OtpService.request", () => {
         { limit: 1, windowSeconds: 60 },
       );
       expect(users.findActiveByPhone).toHaveBeenCalledTimes(1);
-      expect(persistence.saved).toHaveLength(foundUser ? 2 : 0);
+      expect(persistence.saved).toHaveLength(2);
+      expect(persistence.saved.map(({ entity }) => entity)).toEqual([
+        OtpChallengeEntity,
+        OtpDeliveryJobEntity,
+      ]);
+      expect(persistence.saved[0]?.value).toMatchObject({
+        invalidatedAt: expect.any(Date),
+      });
+      expect(persistence.saved[1]?.value).toMatchObject({
+        challengeId: persistence.saved[0]?.value.id,
+        attempts: 0,
+      });
       if (foundUser) {
-        expect(persistence.saved.map(({ entity }) => entity)).toEqual([
-          OtpChallengeEntity,
-          OtpDeliveryJobEntity,
-        ]);
         expect(persistence.saved[0]?.value).toMatchObject({
           id: result.challengeId,
+          userId: foundUser.id,
+          phone: "+989121234567",
+          isDecoy: false,
           invalidatedAt: expect.any(Date),
         });
         expect(persistence.saved[1]?.value).toMatchObject({
           challengeId: result.challengeId,
           status: "PENDING",
-          attempts: 0,
         });
+      } else {
+        expect(persistence.saved[0]?.value).toMatchObject({
+          userId: null,
+          isDecoy: true,
+          requestIp: "0.0.0.0",
+        });
+        expect(result.challengeId).not.toBe(persistence.saved[0]?.value.id);
+        expect(persistence.saved[1]?.value).toMatchObject({
+          status: "DISCARDED",
+          completedAt: expect.any(Date),
+          codeCiphertext: null,
+          codeNonce: null,
+          codeTag: null,
+        });
+        expect(JSON.stringify(persistence.saved)).not.toContain(
+          "+989121234567",
+        );
       }
+    },
+  );
+
+  it.each([
+    ["active", { id: "6e444c58-63ee-4c74-b39d-f72a5eb84d3f" }],
+    ["missing", null],
+  ])(
+    "maps durable transaction failure to the same generic 503 cause for %s requests",
+    async (_kind, foundUser) => {
+      const service = new OtpService(
+        {
+          transaction: vi.fn().mockRejectedValue(new Error("database detail")),
+        } as never,
+        { findActiveByPhone: vi.fn().mockResolvedValue(foundUser) } as never,
+        { consume: vi.fn().mockResolvedValue(undefined) } as never,
+        options,
+        new OtpCodeSealer(pepper),
+        immediateEnvelope,
+      );
+
+      await expect(
+        service.request({ phone: "09121234567" }, context),
+      ).rejects.toMatchObject({
+        code: "OTP_REQUEST_UNAVAILABLE",
+        message: "درخواست کد ورود موقتاً در دسترس نیست.",
+      });
     },
   );
 

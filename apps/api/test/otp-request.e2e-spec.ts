@@ -22,6 +22,7 @@ import { HardenAuditLogBoundary202608280004 } from "../../../packages/platform/d
 import { CreateAccessControl202608280005 } from "../../../packages/platform/database/src/migrations/202608280005-create-access-control.js";
 import { CreateOtp202608280006 } from "../../../packages/platform/database/src/migrations/202608280006-create-otp.js";
 import { CreateOtpDeliveryOutbox202608280007 } from "../../../packages/platform/database/src/migrations/202608280007-create-otp-delivery-outbox.js";
+import { HardenOtpDeliveryOutbox202608280008 } from "../../../packages/platform/database/src/migrations/202608280008-harden-otp-delivery-outbox.js";
 
 const sources: DataSource[] = [];
 let app: INestApplication | undefined;
@@ -52,6 +53,7 @@ describe("OTP request API", () => {
           CreateAccessControl202608280005,
           CreateOtp202608280006,
           CreateOtpDeliveryOutbox202608280007,
+          HardenOtpDeliveryOutbox202608280008,
         ],
         synchronize: false,
       });
@@ -101,14 +103,27 @@ describe("OTP request API", () => {
         ]);
       }
       expect(sent).toHaveLength(0);
-      const [{ count }] = await source.query<Array<{ count: string }>>(
-        `SELECT COUNT(*)::text AS count FROM otp_challenges`,
+      const challengeRows = await source.query<
+        Array<{ id: string; phone: string; isDecoy: boolean }>
+      >(`SELECT id, phone, is_decoy AS "isDecoy" FROM otp_challenges`);
+      expect(challengeRows).toHaveLength(3);
+      expect(challengeRows.filter((row) => row.isDecoy)).toHaveLength(2);
+      expect(JSON.stringify(challengeRows)).not.toContain("+989121234568");
+      expect(JSON.stringify(challengeRows)).not.toContain("+989121234569");
+      expect(challengeRows.map((row) => row.id)).not.toContain(
+        responses[1]?.body.challengeId,
       );
-      expect(count).toBe("1");
-      const [job] = await source.query<Array<{ status: string }>>(
-        `SELECT status FROM otp_delivery_jobs`,
+      expect(challengeRows.map((row) => row.id)).not.toContain(
+        responses[2]?.body.challengeId,
       );
-      expect(job).toEqual({ status: "PENDING" });
+      const jobs = await source.query<Array<{ status: string }>>(
+        `SELECT status FROM otp_delivery_jobs ORDER BY status`,
+      );
+      expect(jobs).toEqual([
+        { status: "DISCARDED" },
+        { status: "DISCARDED" },
+        { status: "PENDING" },
+      ]);
 
       await module.get(OtpDeliveryWorker).runOnce();
       expect(sent).toHaveLength(1);

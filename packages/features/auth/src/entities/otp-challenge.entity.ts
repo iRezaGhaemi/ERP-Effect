@@ -1,4 +1,5 @@
 import {
+  Check,
   Column,
   CreateDateColumn,
   Entity,
@@ -9,12 +10,19 @@ import {
 @Entity({ name: "otp_challenges" })
 @Index("ix_otp_challenges_phone_created_at", ["phone", "createdAt"])
 @Index("ix_otp_challenges_expires_at", ["expiresAt"])
+@Check(
+  "CK_otp_challenges_decoy_user",
+  `("is_decoy" = true AND "user_id" IS NULL) OR ("is_decoy" = false AND "user_id" IS NOT NULL)`,
+)
 export class OtpChallengeEntity {
   @PrimaryColumn({ type: "uuid" })
   id!: string;
 
-  @Column({ name: "user_id", type: "uuid" })
-  userId!: string;
+  @Column({ name: "user_id", type: "uuid", nullable: true })
+  userId!: string | null;
+
+  @Column({ name: "is_decoy", type: "boolean", default: false })
+  isDecoy!: boolean;
 
   @Column({ type: "varchar", length: 13 })
   phone!: string;

@@ -26,6 +26,9 @@ function requestUnavailable(): DomainError {
   );
 }
 
+const DECOY_PHONE = "+980000000000";
+const DECOY_REQUEST_IP = "0.0.0.0";
+
 @Injectable()
 export class OtpService {
   constructor(
@@ -63,45 +66,46 @@ export class OtpService {
     );
     if (rejected) throw rejected.reason;
 
-    const challengeId = randomUUID();
     return this.responseEnvelope.run(async () => {
       try {
-        await this.persistActiveDelivery(challengeId, phone, context);
+        const challengeId = await this.persistDeliveryRecord(phone, context);
+        return this.accepted(challengeId);
       } catch {
         throw requestUnavailable();
       }
-      return this.accepted(challengeId);
     });
   }
 
-  private async persistActiveDelivery(
-    challengeId: string,
+  private async persistDeliveryRecord(
     phone: string,
     context: RequestContext,
-  ): Promise<void> {
+  ): Promise<string> {
     const user = await this.users.findActiveByPhone(phone);
-    if (!user) return;
-
+    const isDecoy = !user;
+    const challengeId = randomUUID();
+    const responseChallengeId = isDecoy ? randomUUID() : challengeId;
     const code = randomInt(0, 1_000_000).toString().padStart(6, "0");
     const codeHash = createHmac("sha256", this.options.pepper)
       .update(`${challengeId}:${code}`)
       .digest("hex");
     const expiresAt = new Date(Date.now() + this.options.ttlSeconds * 1_000);
     const sealed = this.codeSealer.seal(code, challengeId);
+    const now = new Date();
 
     await this.dataSource.transaction(async (manager) => {
       const challenges = manager.getRepository(OtpChallengeEntity);
       await challenges.save(
         challenges.create({
           id: challengeId,
-          userId: user.id,
-          phone,
+          userId: user?.id ?? null,
+          isDecoy,
+          phone: isDecoy ? DECOY_PHONE : phone,
           codeHash,
           attempts: 0,
           expiresAt,
           consumedAt: null,
-          invalidatedAt: new Date(),
-          requestIp: context.ipAddress,
+          invalidatedAt: now,
+          requestIp: isDecoy ? DECOY_REQUEST_IP : context.ipAddress,
         }),
       );
       const jobs = manager.getRepository(OtpDeliveryJobEntity);
@@ -109,18 +113,21 @@ export class OtpService {
         jobs.create({
           id: randomUUID(),
           challengeId,
-          codeCiphertext: sealed.ciphertext,
-          codeNonce: sealed.nonce,
-          codeTag: sealed.tag,
+          codeCiphertext: isDecoy ? null : sealed.ciphertext,
+          codeNonce: isDecoy ? null : sealed.nonce,
+          codeTag: isDecoy ? null : sealed.tag,
           requestId: context.requestId.slice(0, 128) || "unknown",
-          status: "PENDING",
+          status: isDecoy ? "DISCARDED" : "PENDING",
           attempts: 0,
-          availableAt: new Date(),
+          availableAt: now,
           leaseExpiresAt: null,
-          completedAt: null,
+          leaseToken: null,
+          claimVersion: 0,
+          completedAt: isDecoy ? now : null,
         }),
       );
     });
+    return responseChallengeId;
   }
 
   private accepted(challengeId: string): RequestOtpResponse {
