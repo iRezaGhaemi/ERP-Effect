@@ -84,15 +84,49 @@ function matchesWhere(row: Row, where: Record<string, unknown>): boolean {
   });
 }
 
-function createRepository<T extends Row>(rows: T[], Entity: Constructor<T>) {
+type FindAndCountOptions = {
+  where: Record<string, unknown>;
+  order?: Record<string, "ASC" | "DESC">;
+  skip?: number;
+  take?: number;
+};
+
+function compareValues(left: unknown, right: unknown): number {
+  if (left instanceof Date && right instanceof Date)
+    return left.getTime() - right.getTime();
+  return String(left).localeCompare(String(right));
+}
+
+function sortRows<T extends Row>(
+  rows: T[],
+  order: Record<string, "ASC" | "DESC"> | undefined,
+): T[] {
+  if (!order) return rows;
+  return [...rows].sort((left, right) => {
+    for (const [key, direction] of Object.entries(order)) {
+      const comparison = compareValues(
+        left[key as keyof T],
+        right[key as keyof T],
+      );
+      if (comparison !== 0)
+        return direction === "ASC" ? comparison : -comparison;
+    }
+    return 0;
+  });
+}
+
+function createRepository<T extends Row>(
+  rows: T[],
+  Entity: Constructor<T>,
+  onFindAndCount?: (options: FindAndCountOptions) => void,
+) {
   return {
     create(value: Partial<T>): T {
       return Object.assign(new Entity(), value);
     },
     async save(value: T): Promise<T> {
-      const index = rows.findIndex(
-        (row) => "id" in row && "id" in value && row.id === value.id,
-      );
+      const id = typeof value.id === "string" ? value.id : null;
+      const index = id ? rows.findIndex((row) => row.id === id) : -1;
       if (index >= 0) rows[index] = value;
       else rows.push(value);
       return value;
@@ -107,6 +141,17 @@ function createRepository<T extends Row>(rows: T[], Entity: Constructor<T>) {
     },
     async find(options: { where: Record<string, unknown> }): Promise<T[]> {
       return rows.filter((row) => matchesWhere(row, options.where));
+    },
+    async findAndCount(options: FindAndCountOptions): Promise<[T[], number]> {
+      onFindAndCount?.(options);
+      const matching = sortRows(
+        rows.filter((row) => matchesWhere(row, options.where)),
+        options.order,
+      );
+      const total = matching.length;
+      const skip = options.skip ?? 0;
+      const take = options.take ?? total;
+      return [matching.slice(skip, skip + take), total];
     },
     async count(options: { where: Record<string, unknown> }): Promise<number> {
       return rows.filter((row) => matchesWhere(row, options.where)).length;
@@ -148,6 +193,7 @@ function createHarness() {
     sessions: [] as SessionEntity[],
     users: [] as UserEntity[],
   };
+  const sessionListQueries: FindAndCountOptions[] = [];
   const manager = {
     getRepository(Entity: unknown) {
       if (Entity === AuditLogEntity)
@@ -159,7 +205,9 @@ function createHarness() {
       if (Entity === RefreshTokenEntity)
         return createRepository(rows.refreshTokens, RefreshTokenEntity);
       if (Entity === SessionEntity)
-        return createRepository(rows.sessions, SessionEntity);
+        return createRepository(rows.sessions, SessionEntity, (query) =>
+          sessionListQueries.push(query),
+        );
       if (Entity === UserEntity)
         return createRepository(rows.users, UserEntity);
       throw new Error("Unknown repository.");
@@ -211,6 +259,7 @@ function createHarness() {
     options,
     new OtpCodeSealer(pepper),
     new ShortOtpResponseEnvelope(0),
+    auditWriter as never,
     sessionService,
   );
   return {
@@ -219,6 +268,7 @@ function createHarness() {
     otpService,
     refreshTokenRepository: manager.getRepository(RefreshTokenEntity),
     rows,
+    sessionListQueries,
     sessionFixture: new SessionFixture(
       dataSource as never,
       tokenService,
@@ -278,6 +328,24 @@ function succeededDeliveryJob(challengeId: string): OtpDeliveryJobEntity {
   });
 }
 
+function rejectedOtpAudits(rows: { audits: AuditLogEntity[] }) {
+  return rows.audits.filter(({ action }) => action === "auth.otp_rejected");
+}
+
+function expectSafeRejectedOtpAudit(rows: { audits: AuditLogEntity[] }): void {
+  expect(rejectedOtpAudits(rows)).toEqual([
+    expect.objectContaining({
+      actorId: null,
+      action: "auth.otp_rejected",
+      entityType: "auth",
+      entityId: null,
+      metadata: {},
+      ipAddress: context.ipAddress,
+      requestId: context.requestId,
+    }),
+  ]);
+}
+
 describe("OTP verification and rotating sessions", () => {
   it("consumes a delivered OTP challenge exactly once", async () => {
     const harness = createHarness();
@@ -297,6 +365,9 @@ describe("OTP verification and rotating sessions", () => {
     expect(first.accessToken).toEqual(expect.any(String));
     expect(first.refreshToken).toEqual(expect.any(String));
     expect(first.csrfToken).toEqual(expect.any(String));
+    expect(harness.rows.audits.map(({ action }) => action)).toContain(
+      "auth.login_succeeded",
+    );
     await expect(
       harness.otpService.verify(
         { challengeId: challenge.id, code: "123456" },
@@ -313,6 +384,7 @@ describe("OTP verification and rotating sessions", () => {
     expect(harness.rows.audits.map(({ action }) => action)).toContain(
       "auth.login_succeeded",
     );
+    expectSafeRejectedOtpAudit(harness.rows);
     expect(challenge.codeHash).not.toBe("123456");
     expect(
       JSON.stringify({
@@ -345,7 +417,40 @@ describe("OTP verification and rotating sessions", () => {
     expect(challenge.consumedAt).toBeNull();
     expect(harness.rows.sessions).toHaveLength(0);
     expect(harness.rows.refreshTokens).toHaveLength(0);
+    expectSafeRejectedOtpAudit(harness.rows);
   });
+
+  it.each(["missing", "expired", "attempts exhausted"] as const)(
+    "commits one metadata-safe audit event when verification is %s",
+    async (kind) => {
+      const harness = createHarness();
+      const user = activeUser();
+      const challenge = deliveredChallenge(user.id);
+      const challengeId =
+        kind === "missing"
+          ? "0c997665-8368-4790-b2cf-76fe90c6892c"
+          : challenge.id;
+      if (kind === "expired") challenge.expiresAt = new Date(Date.now() - 1);
+      if (kind === "attempts exhausted") challenge.attempts = 5;
+      if (kind !== "missing") {
+        harness.rows.users.push(user);
+        harness.rows.challenges.push(challenge);
+        harness.rows.deliveryJobs.push(succeededDeliveryJob(challenge.id));
+      }
+
+      await expect(
+        harness.otpService.verify({ challengeId, code: "000000" }, context),
+      ).rejects.toMatchObject({ code: "OTP_INVALID" });
+
+      expectSafeRejectedOtpAudit(harness.rows);
+      expect(JSON.stringify(rejectedOtpAudits(harness.rows))).not.toContain(
+        "+989121234567",
+      );
+      expect(JSON.stringify(rejectedOtpAudits(harness.rows))).not.toContain(
+        "000000",
+      );
+    },
+  );
 
   it.each([
     [
@@ -378,6 +483,7 @@ describe("OTP verification and rotating sessions", () => {
       expect(challenge.consumedAt).toBeNull();
       expect(harness.rows.sessions).toHaveLength(0);
       expect(harness.rows.refreshTokens).toHaveLength(0);
+      expectSafeRejectedOtpAudit(harness.rows);
     },
   );
 
@@ -440,6 +546,45 @@ describe("OTP verification and rotating sessions", () => {
     ).resolves.toBe(0);
   });
 
+  it("paginates active sessions with a stable id tie-breaker", async () => {
+    const harness = createHarness();
+    const user = activeUser();
+    harness.rows.users.push(user);
+    const sessions = await Promise.all(
+      Array.from({ length: 3 }, () =>
+        harness.sessionFixture.createActiveSession({ userId: user.id }),
+      ),
+    );
+    for (const session of harness.rows.sessions) {
+      session.createdAt = new Date("2026-08-28T01:00:00.000Z");
+      session.lastUsedAt = new Date("2026-08-28T02:00:00.000Z");
+    }
+    const expectedIds = sessions
+      .map(({ sessionId }) => sessionId)
+      .sort()
+      .reverse();
+
+    const page = await harness.sessionService.listSessions(
+      user.id,
+      sessions[0]!.sessionId,
+      { page: 2, pageSize: 1 },
+    );
+
+    expect(page.meta).toEqual({
+      page: 2,
+      pageSize: 1,
+      total: 3,
+      pageCount: 3,
+    });
+    expect(page.items.map(({ id }) => id)).toEqual([expectedIds[1]]);
+    expect(harness.sessionListQueries).toHaveLength(1);
+    expect(harness.sessionListQueries[0]).toMatchObject({
+      order: { lastUsedAt: "DESC", createdAt: "DESC", id: "DESC" },
+      skip: 1,
+      take: 1,
+    });
+  });
+
   it("masks an IPv4-mapped address in the active session list", async () => {
     const harness = createHarness();
     const user = activeUser();
@@ -456,9 +601,10 @@ describe("OTP verification and rotating sessions", () => {
     const sessions = await harness.sessionService.listSessions(
       user.id,
       current.sessionId,
+      { page: 1, pageSize: 20 },
     );
 
-    expect(sessions[0]).toMatchObject({
+    expect(sessions.items[0]).toMatchObject({
       current: true,
       id: current.sessionId,
       ipAddress: "192.168.42.0",

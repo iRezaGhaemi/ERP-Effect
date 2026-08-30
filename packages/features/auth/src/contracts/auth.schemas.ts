@@ -1,3 +1,4 @@
+import { createPageSchema } from "@effect-erp/contracts";
 import { z } from "zod";
 
 const persianDigits = "۰۱۲۳۴۵۶۷۸۹";
@@ -60,6 +61,13 @@ export const AuthSessionItemSchema = z.object({
   current: z.boolean(),
 });
 
+export const AuthSessionListQuerySchema = z.object({
+  page: z.coerce.number().int().positive().max(10_000).default(1),
+  pageSize: z.coerce.number().int().positive().max(100).default(20),
+});
+
+export const AuthSessionPageSchema = createPageSchema(AuthSessionItemSchema);
+
 export const MeResponseSchema = z.object({
   user: AuthUserSummarySchema,
   permissions: z.array(z.string()),
@@ -71,4 +79,5 @@ export type VerifyOtpInput = z.input<typeof VerifyOtpSchema>;
 export type AuthUserSummary = z.infer<typeof AuthUserSummarySchema>;
 export type AuthSessionResponse = z.infer<typeof AuthSessionResponseSchema>;
 export type AuthSessionItem = z.infer<typeof AuthSessionItemSchema>;
+export type AuthSessionListQuery = z.infer<typeof AuthSessionListQuerySchema>;
 export type MeResponse = z.infer<typeof MeResponseSchema>;

@@ -1,4 +1,5 @@
 import {
+  AuthSessionPageSchema,
   AuthSessionResponseSchema,
   MeResponseSchema,
 } from "@effect/auth/contracts";
@@ -139,6 +140,22 @@ describe("auth session API", () => {
         .set("Cookie", authCookies)
         .expect(200);
       expect(() => MeResponseSchema.parse(me.body)).not.toThrow();
+
+      const sessions = await request(app.getHttpServer())
+        .get("/api/v1/auth/sessions?page=1&pageSize=1")
+        .set("Cookie", authCookies)
+        .expect(200);
+      expect(() => AuthSessionPageSchema.parse(sessions.body)).not.toThrow();
+      expect(sessions.body.meta).toEqual({
+        page: 1,
+        pageSize: 1,
+        total: 1,
+        pageCount: 1,
+      });
+      expect(sessions.body.items[0]).toMatchObject({
+        id: verified.body.sessionId,
+        current: true,
+      });
 
       const logout = await request(app.getHttpServer())
         .post("/api/v1/auth/logout")

@@ -12,12 +12,18 @@ import {
   Optional,
   Param,
   Post,
+  Query,
   Req,
   Res,
 } from "@nestjs/common";
 import { z } from "zod";
 
-import { RequestOtpSchema, VerifyOtpSchema } from "../contracts/index.js";
+import {
+  AuthSessionListQuerySchema,
+  AuthSessionPageSchema,
+  RequestOtpSchema,
+  VerifyOtpSchema,
+} from "../contracts/index.js";
 import { AUTH_OPTIONS, type AuthOptions } from "./auth.options.js";
 import { parseCookieHeader } from "./cookie-parser.js";
 import { OtpService } from "./otp.service.js";
@@ -268,14 +274,16 @@ export class AuthController {
   }
 
   @Get("auth/sessions")
-  listSessions(@Req() request: RequestWithContext) {
+  listSessions(@Query() query: unknown, @Req() request: RequestWithContext) {
     return execute(request, async () => {
       if (!this.sessions || !request.user)
         throw new DomainError("SESSION_INVALID", "نشست نامعتبر است.");
-      return this.sessions.listSessions(
+      const page = await this.sessions.listSessions(
         request.user.userId,
         request.user.sessionId,
+        AuthSessionListQuerySchema.parse(query),
       );
+      return AuthSessionPageSchema.parse(page);
     });
   }
 

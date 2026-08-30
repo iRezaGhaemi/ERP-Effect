@@ -114,6 +114,7 @@ describe("OTP request persistence", () => {
         },
         new OtpCodeSealer(pepper),
         new ShortOtpResponseEnvelope(0),
+        new AuditWriter(database.runtime),
       );
 
       const response = await service.request(
@@ -254,6 +255,7 @@ describe("OTP request persistence", () => {
         },
         new OtpCodeSealer(pepper),
         new ShortOtpResponseEnvelope(0),
+        new AuditWriter(database.runtime),
       );
       const response = await service.request(
         { phone: "09121234567" },
@@ -340,6 +342,7 @@ describe("OTP request persistence", () => {
         },
         new OtpCodeSealer(pepper),
         new ShortOtpResponseEnvelope(0),
+        new AuditWriter(database.runtime),
       );
       const requestContext = {
         requestId: "req_resend",
@@ -396,6 +399,7 @@ describe("OTP request persistence", () => {
         },
         new OtpCodeSealer(pepper),
         new ShortOtpResponseEnvelope(0),
+        new AuditWriter(database.runtime),
       );
       const response = await service.request(
         { phone: "09121234567" },
@@ -488,6 +492,7 @@ describe("OTP request persistence", () => {
         },
         new OtpCodeSealer(pepper),
         new ShortOtpResponseEnvelope(0),
+        new AuditWriter(database.runtime),
       );
 
       const response = await service.request(

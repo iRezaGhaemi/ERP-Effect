@@ -42,6 +42,7 @@ class VirtualResponseTime {
 }
 
 const immediateEnvelope = new ShortOtpResponseEnvelope(0);
+const auditWriter = { write: vi.fn() };
 
 function persistenceDouble() {
   const saved: Array<{ entity: unknown; value: Record<string, unknown> }> = [];
@@ -78,6 +79,7 @@ describe("OtpService.request", () => {
         options,
         new OtpCodeSealer(pepper),
         immediateEnvelope,
+        auditWriter as never,
       );
 
       const result = await service.request({ phone: "09121234567" }, context);
@@ -154,6 +156,7 @@ describe("OtpService.request", () => {
         options,
         new OtpCodeSealer(pepper),
         immediateEnvelope,
+        auditWriter as never,
       );
 
       await expect(
@@ -179,6 +182,7 @@ describe("OtpService.request", () => {
       options,
       sealer,
       immediateEnvelope,
+      auditWriter as never,
     );
 
     const response = await service.request({ phone: "09121234567" }, context);
@@ -215,6 +219,7 @@ describe("OtpService.request", () => {
       options,
       new OtpCodeSealer(pepper),
       immediateEnvelope,
+      auditWriter as never,
     );
     await expect(
       service.request({ phone: "09121234567" }, context),
@@ -236,6 +241,7 @@ describe("OtpService.request", () => {
       options,
       new OtpCodeSealer(pepper),
       immediateEnvelope,
+      auditWriter as never,
     );
     await expect(
       service.request({ phone: "09121234567" }, context),
@@ -259,6 +265,7 @@ describe("OtpService.request", () => {
       options,
       new OtpCodeSealer(pepper),
       immediateEnvelope,
+      auditWriter as never,
     );
     await expect(
       service.request({ phone: "09121234567" }, context),

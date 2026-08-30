@@ -2,11 +2,16 @@ import { randomUUID } from "node:crypto";
 import { isIP } from "node:net";
 
 import { AuditWriter } from "@effect/audit/server";
-import { DomainError, type RequestContext } from "@effect-erp/contracts";
+import {
+  DomainError,
+  type Page,
+  type RequestContext,
+} from "@effect-erp/contracts";
 import { UserEntity, UserStatus } from "@effect/users/entities";
 import { Inject, Injectable } from "@nestjs/common";
 import { DataSource, type EntityManager, IsNull, MoreThan } from "typeorm";
 
+import type { AuthSessionListQuery } from "../contracts/index.js";
 import {
   RefreshTokenEntity,
   SessionEntity,
@@ -340,25 +345,35 @@ export class SessionService {
   async listSessions(
     userId: string,
     currentSessionId: string,
-  ): Promise<SessionListItem[]> {
-    const sessions = await this.dataSource.manager
+    query: AuthSessionListQuery,
+  ): Promise<Page<SessionListItem>> {
+    const [sessions, total] = await this.dataSource.manager
       .getRepository(SessionEntity)
-      .find({
+      .findAndCount({
         where: {
           userId,
           revokedAt: IsNull(),
           expiresAt: MoreThan(new Date()),
         },
-        order: { lastUsedAt: "DESC", createdAt: "DESC" },
+        order: { lastUsedAt: "DESC", createdAt: "DESC", id: "DESC" },
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize,
       });
-    return sessions.map((session) => ({
-      id: session.id,
-      device: deviceName(session.userAgent),
-      ipAddress: maskIpAddress(session.ipAddress),
-      createdAt: session.createdAt.toISOString(),
-      lastUsedAt: session.lastUsedAt.toISOString(),
-      current: session.id === currentSessionId,
-    }));
+    return {
+      items: sessions.map((session) => ({
+        id: session.id,
+        device: deviceName(session.userAgent),
+        ipAddress: maskIpAddress(session.ipAddress),
+        createdAt: session.createdAt.toISOString(),
+        lastUsedAt: session.lastUsedAt.toISOString(),
+        current: session.id === currentSessionId,
+      })),
+      meta: {
+        ...query,
+        total,
+        pageCount: Math.ceil(total / query.pageSize),
+      },
+    };
   }
 
   async me(userId: string, permissions: string[]): Promise<MeResult> {

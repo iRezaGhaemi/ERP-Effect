@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
+import {
+  AuthSessionListQuerySchema,
+  AuthSessionPageSchema,
+} from "../contracts/index.js";
 import { AuthController } from "./auth.controller.js";
 
 const authOptions = {
@@ -209,5 +213,52 @@ describe("AuthController session cookies", () => {
       sameSite: "lax",
       secure: false,
     });
+  });
+
+  it("uses the bounded session-page contract for the active user's sessions", async () => {
+    const page = {
+      items: [
+        {
+          id: authResult.sessionId,
+          device: "Vitest Browser",
+          ipAddress: "127.0.0.0",
+          createdAt: "2026-08-28T00:00:00.000Z",
+          lastUsedAt: "2026-08-28T00:00:00.000Z",
+          current: true,
+        },
+      ],
+      meta: { page: 2, pageSize: 1, total: 3, pageCount: 3 },
+    };
+    const sessionService = { listSessions: vi.fn().mockResolvedValue(page) };
+    const controller = new AuthController(
+      { request: vi.fn() } as never,
+      sessionService as never,
+      authOptions,
+    );
+
+    const body = await controller.listSessions(
+      { page: "2", pageSize: "1" },
+      request,
+    );
+
+    expect(sessionService.listSessions).toHaveBeenCalledWith(
+      authResult.user.id,
+      authResult.sessionId,
+      { page: 2, pageSize: 1 },
+    );
+    expect(() => AuthSessionPageSchema.parse(body)).not.toThrow();
+    expect(AuthSessionListQuerySchema.parse({})).toEqual({
+      page: 1,
+      pageSize: 20,
+    });
+    expect(() =>
+      AuthSessionListQuerySchema.parse({ page: "0", pageSize: "1" }),
+    ).toThrow();
+    expect(() =>
+      AuthSessionListQuerySchema.parse({ page: "10001", pageSize: "1" }),
+    ).toThrow();
+    expect(() =>
+      AuthSessionListQuerySchema.parse({ page: "1", pageSize: "101" }),
+    ).toThrow();
   });
 });

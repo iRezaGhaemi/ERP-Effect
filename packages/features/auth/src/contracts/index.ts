@@ -1,5 +1,7 @@
 export {
   AuthSessionItemSchema,
+  AuthSessionListQuerySchema,
+  AuthSessionPageSchema,
   AuthSessionResponseSchema,
   AuthUserSummarySchema,
   MeResponseSchema,
@@ -9,6 +11,7 @@ export {
 } from "./auth.schemas.js";
 export type {
   AuthSessionItem,
+  AuthSessionListQuery,
   AuthSessionResponse,
   AuthUserSummary,
   MeResponse,

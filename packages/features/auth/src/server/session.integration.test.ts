@@ -155,6 +155,7 @@ describe("OTP verification and session rotation integration", () => {
         options,
         new OtpCodeSealer(pepper),
         new ShortOtpResponseEnvelope(0),
+        new AuditWriter(database.runtime),
         sessionService(database.runtime),
       );
 
@@ -240,6 +241,7 @@ describe("OTP verification and session rotation integration", () => {
         options,
         new OtpCodeSealer(pepper),
         new ShortOtpResponseEnvelope(0),
+        new AuditWriter(database.runtime),
         sessionService(database.runtime),
       );
 
@@ -255,13 +257,86 @@ describe("OTP verification and session rotation integration", () => {
       ).rejects.toMatchObject({ code: "OTP_INVALID" });
 
       const [state] = await database.runtime.query<
-        Array<{ attempts: number; invalidatedAt: Date | null }>
+        Array<{
+          attempts: number;
+          invalidatedAt: Date | null;
+          rejectedAuditCount: string;
+          rejectedAuditMetadata: Record<string, unknown>;
+        }>
       >(
-        `SELECT attempts, invalidated_at AS "invalidatedAt"
-         FROM otp_challenges WHERE id = $1`,
+        `SELECT
+          (SELECT attempts FROM otp_challenges WHERE id = $1) AS attempts,
+          (SELECT invalidated_at FROM otp_challenges WHERE id = $1) AS "invalidatedAt",
+          (SELECT COUNT(*)::text FROM audit_logs WHERE action = 'auth.otp_rejected') AS "rejectedAuditCount",
+          (SELECT metadata FROM audit_logs WHERE action = 'auth.otp_rejected' ORDER BY created_at DESC LIMIT 1) AS "rejectedAuditMetadata"`,
         [challengeId],
       );
-      expect(state).toEqual({ attempts: 1, invalidatedAt: null });
+      expect(state).toEqual({
+        attempts: 1,
+        invalidatedAt: null,
+        rejectedAuditCount: "1",
+        rejectedAuditMetadata: {},
+      });
+    } finally {
+      await database.stop();
+    }
+  });
+
+  it("commits a safe OTP-rejection audit when no challenge row exists", async () => {
+    const database = await prepareDatabase();
+    try {
+      const service = new OtpService(
+        database.runtime,
+        new UsersFacade(database.runtime),
+        new RateLimitService(database.runtime, pepper),
+        options,
+        new OtpCodeSealer(pepper),
+        new ShortOtpResponseEnvelope(0),
+        new AuditWriter(database.runtime),
+        sessionService(database.runtime),
+      );
+
+      await expect(
+        service.verify(
+          {
+            challengeId: "d426e7ba-5a2e-42a2-b8e1-777d5e02285a",
+            code: "000000",
+          },
+          {
+            requestId: "req_verify_missing",
+            ipAddress: "127.0.0.1",
+            userAgent: "vitest",
+          },
+        ),
+      ).rejects.toMatchObject({ code: "OTP_INVALID" });
+
+      const [audit] = await database.runtime.query<
+        Array<{
+          action: string;
+          actorId: string | null;
+          entityType: string;
+          entityId: string | null;
+          metadata: Record<string, unknown>;
+          requestId: string;
+        }>
+      >(
+        `SELECT
+          action,
+          actor_id AS "actorId",
+          entity_type AS "entityType",
+          entity_id AS "entityId",
+          metadata,
+          request_id AS "requestId"
+         FROM audit_logs WHERE action = 'auth.otp_rejected'`,
+      );
+      expect(audit).toEqual({
+        action: "auth.otp_rejected",
+        actorId: null,
+        entityType: "auth",
+        entityId: null,
+        metadata: {},
+        requestId: "req_verify_missing",
+      });
     } finally {
       await database.stop();
     }

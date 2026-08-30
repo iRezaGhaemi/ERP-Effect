@@ -5,11 +5,12 @@ import {
   timingSafeEqual,
 } from "node:crypto";
 
+import { AuditWriter } from "@effect/audit/server";
 import { DomainError, type RequestContext } from "@effect-erp/contracts";
 import { UserEntity, UserStatus } from "@effect/users/entities";
 import { UsersFacade, normalizeIranianMobile } from "@effect/users/server";
 import { Inject, Injectable, Optional } from "@nestjs/common";
-import { DataSource } from "typeorm";
+import { DataSource, type EntityManager } from "typeorm";
 
 import {
   RequestOtpSchema,
@@ -56,6 +57,7 @@ export class OtpService {
     @Inject(OTP_CODE_SEALER) private readonly codeSealer: OtpCodeSealer,
     @Inject(OTP_RESPONSE_ENVELOPE)
     private readonly responseEnvelope: OtpResponseEnvelope,
+    private readonly auditWriter: AuditWriter,
     @Optional() private readonly sessions?: SessionService,
   ) {}
 
@@ -99,7 +101,6 @@ export class OtpService {
     context: RequestContext,
   ): Promise<AuthResult> {
     const sessions = this.sessions;
-    if (!sessions) throw otpInvalid();
     const values = VerifyOtpSchema.parse(input);
     const outcome = await this.dataSource.transaction<VerifyOutcome>(
       async (manager) => {
@@ -118,7 +119,7 @@ export class OtpService {
           challenge.expiresAt <= now ||
           challenge.attempts >= maxOtpAttempts
         ) {
-          return { status: "invalid" };
+          return this.rejectVerification(manager, context);
         }
 
         const delivery = await manager
@@ -127,7 +128,8 @@ export class OtpService {
             where: { challengeId: challenge.id },
             lock: { mode: "pessimistic_read" },
           });
-        if (delivery?.status !== "SUCCEEDED") return { status: "invalid" };
+        if (delivery?.status !== "SUCCEEDED")
+          return this.rejectVerification(manager, context);
 
         const expectedHash = createHmac("sha256", this.options.pepper)
           .update(`${challenge.id}:${values.code}`)
@@ -137,15 +139,15 @@ export class OtpService {
           if (challenge.attempts >= maxOtpAttempts)
             challenge.invalidatedAt = now;
           await challenges.save(challenge);
-          return { status: "invalid" };
+          return this.rejectVerification(manager, context);
         }
 
         const user = await manager.getRepository(UserEntity).findOne({
           where: { id: challenge.userId },
           lock: { mode: "pessimistic_write" },
         });
-        if (!user || user.status !== UserStatus.ACTIVE)
-          return { status: "invalid" };
+        if (!user || user.status !== UserStatus.ACTIVE || !sessions)
+          return this.rejectVerification(manager, context);
 
         user.lastLoginAt = now;
         challenge.consumedAt = now;
@@ -159,6 +161,25 @@ export class OtpService {
     );
     if (outcome.status === "invalid") throw otpInvalid();
     return outcome.result;
+  }
+
+  private async rejectVerification(
+    manager: EntityManager,
+    context: RequestContext,
+  ): Promise<VerifyOutcome> {
+    await this.auditWriter.write(
+      {
+        actorId: null,
+        action: "auth.otp_rejected",
+        entityType: "auth",
+        entityId: null,
+        metadata: {},
+        ipAddress: context.ipAddress,
+        requestId: context.requestId,
+      },
+      manager,
+    );
+    return { status: "invalid" };
   }
 
   private async persistDeliveryRecord(
