@@ -9,6 +9,7 @@ import {
   PermissionGuard,
 } from "@effect/access-control/server";
 import { AuditLogPageSchema } from "@effect/audit/contracts";
+import { AuthenticationGuard } from "@effect/auth/server";
 import { entityRegistry, seedInitialAccess } from "@effect-erp/database";
 import {
   UserDetailDtoSchema,
@@ -49,6 +50,12 @@ class TestingPermissionGuard extends PermissionGuard implements CanActivate {
         permissions: [],
       };
     return super.canActivate(context);
+  }
+}
+
+class TestingAuthenticationGuard implements CanActivate {
+  canActivate(): boolean {
+    return true;
   }
 }
 
@@ -114,6 +121,8 @@ describe("access-control API", () => {
       const module = await Test.createTestingModule({ imports: [AppModule] })
         .overrideProvider(DataSource)
         .useValue(runtime)
+        .overrideProvider(AuthenticationGuard)
+        .useClass(TestingAuthenticationGuard)
         .overrideProvider(PermissionGuard)
         .useFactory({
           factory: (reflector: Reflector, access: AccessControlService) =>

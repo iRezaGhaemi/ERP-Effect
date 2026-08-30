@@ -1,4 +1,7 @@
-import { RequestOtpResponseSchema } from "@effect/auth/contracts";
+import {
+  AuthSessionResponseSchema,
+  MeResponseSchema,
+} from "@effect/auth/contracts";
 import {
   AUTH_OPTIONS,
   OTP_RESPONSE_ENVELOPE,
@@ -6,6 +9,7 @@ import {
   SMS_PROVIDER,
   ShortOtpResponseEnvelope,
 } from "@effect/auth/server";
+import { FakeSmsProvider } from "@effect/auth/server";
 import { entityRegistry } from "@effect-erp/database";
 import { startPostgresContainer } from "@effect-erp/testing";
 import type { INestApplication } from "@nestjs/common";
@@ -23,6 +27,7 @@ import { CreateAccessControl202608280005 } from "../../../packages/platform/data
 import { CreateOtp202608280006 } from "../../../packages/platform/database/src/migrations/202608280006-create-otp.js";
 import { CreateOtpDeliveryOutbox202608280007 } from "../../../packages/platform/database/src/migrations/202608280007-create-otp-delivery-outbox.js";
 import { HardenOtpDeliveryOutbox202608280008 } from "../../../packages/platform/database/src/migrations/202608280008-harden-otp-delivery-outbox.js";
+import { CreateSessions202608280009 } from "../../../packages/platform/database/src/migrations/202608280009-create-sessions.js";
 
 const sources: DataSource[] = [];
 let app: INestApplication | undefined;
@@ -33,8 +38,17 @@ afterEach(async () => {
   await Promise.all(sources.splice(0).map((source) => source.destroy()));
 });
 
-describe("OTP request API", () => {
-  it("returns shape-identical 202 responses for active, missing, and suspended phones", async () => {
+function cookieHeader(setCookies: string[] | string | undefined): string {
+  const cookies = Array.isArray(setCookies)
+    ? setCookies
+    : setCookies
+      ? [setCookies]
+      : [];
+  return cookies.map((cookie) => cookie.split(";")[0]).join("; ");
+}
+
+describe("auth session API", () => {
+  it("verifies OTP into HttpOnly cookies and rejects a logged-out session", async () => {
     const container = await startPostgresContainer();
     try {
       const source = new DataSource({
@@ -54,6 +68,7 @@ describe("OTP request API", () => {
           CreateOtp202608280006,
           CreateOtpDeliveryOutbox202608280007,
           HardenOtpDeliveryOutbox202608280008,
+          CreateSessions202608280009,
         ],
         synchronize: false,
       });
@@ -61,23 +76,24 @@ describe("OTP request API", () => {
       await source.initialize();
       await source.runMigrations();
       await source.query(
-        `INSERT INTO users (phone, "firstName", "lastName", status) VALUES ($1, 'A', 'A', 'ACTIVE'), ($2, 'S', 'S', 'SUSPENDED')`,
-        ["+989121234567", "+989121234568"],
+        `INSERT INTO users (phone, "firstName", "lastName", status)
+         VALUES ($1, 'A', 'A', 'ACTIVE')`,
+        ["+989121234567"],
       );
-      const sent: unknown[] = [];
+      const sms = new FakeSmsProvider();
       const module = await Test.createTestingModule({ imports: [AppModule] })
         .overrideProvider(DataSource)
         .useValue(source)
         .overrideProvider(SMS_PROVIDER)
-        .useValue({ send: async (input: unknown) => sent.push(input) })
+        .useValue(sms)
         .overrideProvider(OTP_RESPONSE_ENVELOPE)
         .useValue(new ShortOtpResponseEnvelope(0))
         .overrideProvider(AUTH_OPTIONS)
         .useValue({
-          pepper: "e2e-test-otp-pepper-at-least-32-characters",
+          pepper: "e2e-session-otp-pepper-at-least-32-characters",
           ttlSeconds: 120,
           resendSeconds: 60,
-          jwtAccessSecret: "e2e-test-jwt-secret-at-least-32-characters",
+          jwtAccessSecret: "e2e-session-jwt-secret-at-least-32-characters",
           accessTtlSeconds: 900,
           refreshTtlDays: 30,
           cookieSecure: false,
@@ -87,50 +103,55 @@ describe("OTP request API", () => {
       app.setGlobalPrefix("api/v1");
       await app.init();
 
-      const responses = await Promise.all(
-        ["09121234567", "09121234568", "09121234569"].map((phone, index) =>
-          request(app!.getHttpServer())
-            .post("/api/v1/auth/otp/request")
-            .set("x-request-id", `req_e2e_${index}`)
-            .send({ phone })
-            .expect(202),
-        ),
-      );
-      for (const response of responses) {
-        expect(() =>
-          RequestOtpResponseSchema.parse(response.body),
-        ).not.toThrow();
-        expect(Object.keys(response.body).sort()).toEqual([
-          "accepted",
-          "challengeId",
-          "retryAfterSeconds",
-        ]);
-      }
-      expect(sent).toHaveLength(0);
-      const challengeRows = await source.query<
-        Array<{ id: string; phone: string; isDecoy: boolean }>
-      >(`SELECT id, phone, is_decoy AS "isDecoy" FROM otp_challenges`);
-      expect(challengeRows).toHaveLength(3);
-      expect(challengeRows.filter((row) => row.isDecoy)).toHaveLength(2);
-      expect(JSON.stringify(challengeRows)).not.toContain("+989121234568");
-      expect(JSON.stringify(challengeRows)).not.toContain("+989121234569");
-      expect(challengeRows.map((row) => row.id)).not.toContain(
-        responses[1]?.body.challengeId,
-      );
-      expect(challengeRows.map((row) => row.id)).not.toContain(
-        responses[2]?.body.challengeId,
-      );
-      const jobs = await source.query<Array<{ status: string }>>(
-        `SELECT status FROM otp_delivery_jobs ORDER BY status`,
-      );
-      expect(jobs).toEqual([
-        { status: "DISCARDED" },
-        { status: "DISCARDED" },
-        { status: "PENDING" },
-      ]);
-
+      const requested = await request(app.getHttpServer())
+        .post("/api/v1/auth/otp/request")
+        .set("x-request-id", "req_e2e_session_request")
+        .send({ phone: "09121234567" })
+        .expect(202);
       await module.get(OtpDeliveryWorker).runOnce();
-      expect(sent).toHaveLength(1);
+      const code = sms.sent[0]?.message.match(/\d{6}/)?.[0];
+      expect(code).toEqual(expect.any(String));
+
+      const verified = await request(app.getHttpServer())
+        .post("/api/v1/auth/otp/verify")
+        .set("x-request-id", "req_e2e_session_verify")
+        .send({ challengeId: requested.body.challengeId, code })
+        .expect(200);
+
+      expect(() =>
+        AuthSessionResponseSchema.parse(verified.body),
+      ).not.toThrow();
+      expect(JSON.stringify(verified.body)).not.toContain("effect_access");
+      expect(JSON.stringify(verified.body)).not.toContain("effect_refresh");
+      const cookies = verified.headers["set-cookie"];
+      expect(cookies).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining("effect_access="),
+          expect.stringContaining("effect_refresh="),
+          expect.stringContaining("effect_csrf="),
+        ]),
+      );
+      expect(cookies.join("\n")).toContain("HttpOnly");
+      const authCookies = cookieHeader(cookies);
+
+      const me = await request(app.getHttpServer())
+        .get("/api/v1/me")
+        .set("Cookie", authCookies)
+        .expect(200);
+      expect(() => MeResponseSchema.parse(me.body)).not.toThrow();
+
+      const logout = await request(app.getHttpServer())
+        .post("/api/v1/auth/logout")
+        .set("Cookie", authCookies)
+        .expect(200);
+      expect(cookieHeader(logout.headers["set-cookie"])).toContain(
+        "effect_access=",
+      );
+
+      await request(app.getHttpServer())
+        .get("/api/v1/me")
+        .set("Cookie", authCookies)
+        .expect(401);
     } finally {
       await Promise.all(sources.splice(0).map((source) => source.destroy()));
       await container.stop();

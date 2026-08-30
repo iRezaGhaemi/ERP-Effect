@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+const smsHttpProviderTimeoutSeconds = 5;
+
 const RawEnvSchema = z
   .object({
     NODE_ENV: z
@@ -51,6 +53,23 @@ const RawEnvSchema = z
           "OTP_DELIVERY_ACTIVATION_MARGIN_SECONDS is required in production.",
         path: ["OTP_DELIVERY_ACTIVATION_MARGIN_SECONDS"],
       });
+    }
+
+    if (env.NODE_ENV === "production") {
+      const activationMargin = env.OTP_DELIVERY_ACTIVATION_MARGIN_SECONDS ?? 0;
+      const minimumSafeTtlSeconds = Math.max(
+        30,
+        smsHttpProviderTimeoutSeconds + activationMargin + 1,
+      );
+
+      if (env.OTP_TTL_SECONDS < minimumSafeTtlSeconds) {
+        context.addIssue({
+          code: "custom",
+          message:
+            "OTP_TTL_SECONDS must be at least 30 and greater than the SMS HTTP provider timeout plus OTP_DELIVERY_ACTIVATION_MARGIN_SECONDS in production.",
+          path: ["OTP_TTL_SECONDS"],
+        });
+      }
     }
 
     if (env.NODE_ENV !== "development" && env.COOKIE_SECURE === "false") {

@@ -14,7 +14,15 @@ import { ConsoleSmsProvider } from "./sms/console-sms.provider.js";
 import { HttpSmsProvider } from "./sms/http-sms.provider.js";
 
 const pepper = "unit-test-otp-pepper-at-least-32-characters";
-const options = { pepper, ttlSeconds: 120, resendSeconds: 60 };
+const options = {
+  pepper,
+  ttlSeconds: 120,
+  resendSeconds: 60,
+  jwtAccessSecret: "unit-test-jwt-secret-at-least-32-characters",
+  accessTtlSeconds: 900,
+  refreshTtlDays: 30,
+  cookieSecure: false,
+};
 const context: RequestContext = {
   requestId: "req_otp_unit",
   ipAddress: "127.0.0.1",

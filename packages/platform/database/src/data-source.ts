@@ -11,6 +11,7 @@ import { CreateAccessControl202608280005 } from "./migrations/202608280005-creat
 import { CreateOtp202608280006 } from "./migrations/202608280006-create-otp.js";
 import { CreateOtpDeliveryOutbox202608280007 } from "./migrations/202608280007-create-otp-delivery-outbox.js";
 import { HardenOtpDeliveryOutbox202608280008 } from "./migrations/202608280008-harden-otp-delivery-outbox.js";
+import { CreateSessions202608280009 } from "./migrations/202608280009-create-sessions.js";
 
 export type DatabaseOptions = {
   url: string;
@@ -30,6 +31,7 @@ export function createDataSource(options: DatabaseOptions): DataSource {
       CreateOtp202608280006,
       CreateOtpDeliveryOutbox202608280007,
       HardenOtpDeliveryOutbox202608280008,
+      CreateSessions202608280009,
     ],
     synchronize: false,
   });

@@ -24,11 +24,13 @@
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
+    "@effect/access-control": "workspace:*",
     "@effect/audit": "workspace:*",
     "@effect-erp/config": "workspace:*",
     "@effect-erp/contracts": "workspace:*",
     "@effect/users": "workspace:*",
     "@nestjs/common": "^11.1.17",
+    "@nestjs/core": "^11.1.17",
     "typeorm": "^0.3.28",
     "zod": "^4.4.3"
   },

@@ -3,6 +3,8 @@ import {
   OtpChallengeEntity,
   OtpDeliveryJobEntity,
   RateLimitBucketEntity,
+  RefreshTokenEntity,
+  SessionEntity,
 } from "@effect/auth/entities";
 import {
   PermissionEntity,
@@ -18,6 +20,8 @@ export const entityRegistry: Array<Function | EntitySchema> = [
   OtpChallengeEntity,
   OtpDeliveryJobEntity,
   RateLimitBucketEntity,
+  SessionEntity,
+  RefreshTokenEntity,
   UserEntity,
   AuditLogEntity,
   RoleEntity,

@@ -1,9 +1,11 @@
 import { AuditModule } from "@effect/audit/server";
+import { AccessControlModule } from "@effect/access-control/server";
 import { parseEnv } from "@effect-erp/config";
 import { UsersModule } from "@effect/users/server";
 import { Logger, Module } from "@nestjs/common";
 
 import { AUTH_OPTIONS } from "./auth.options.js";
+import { AuthenticationGuard } from "./authentication.guard.js";
 import { AuthController } from "./auth.controller.js";
 import { OTP_CODE_SEALER, OtpCodeSealer } from "./otp-code-sealer.js";
 import {
@@ -16,6 +18,7 @@ import {
   ShortOtpResponseEnvelope,
 } from "./otp-response-envelope.js";
 import { RateLimitService } from "./rate-limit.service.js";
+import { SessionService } from "./session.service.js";
 import { ConsoleSmsProvider } from "./sms/console-sms.provider.js";
 import { FakeSmsProvider } from "./sms/fake-sms.provider.js";
 import {
@@ -23,6 +26,7 @@ import {
   HttpSmsProvider,
 } from "./sms/http-sms.provider.js";
 import { SMS_PROVIDER } from "./sms/sms-provider.js";
+import { TokenService } from "./token.service.js";
 
 function loadEnv() {
   const testDefaults =
@@ -41,7 +45,7 @@ function loadEnv() {
 }
 
 @Module({
-  imports: [AuditModule, UsersModule],
+  imports: [AuditModule, UsersModule, AccessControlModule],
   controllers: [AuthController],
   providers: [
     {
@@ -52,6 +56,10 @@ function loadEnv() {
           pepper: env.OTP_PEPPER,
           ttlSeconds: env.OTP_TTL_SECONDS,
           resendSeconds: env.OTP_RESEND_SECONDS,
+          jwtAccessSecret: env.JWT_ACCESS_SECRET,
+          accessTtlSeconds: 900,
+          refreshTtlDays: env.REFRESH_TTL_DAYS,
+          cookieSecure: env.COOKIE_SECURE,
         };
       },
     },
@@ -99,8 +107,11 @@ function loadEnv() {
       useFactory: () => new ShortOtpResponseEnvelope(),
     },
     RateLimitService,
+    TokenService,
+    SessionService,
     OtpService,
     OtpDeliveryWorker,
+    AuthenticationGuard,
   ],
   exports: [
     AUTH_OPTIONS,
@@ -109,8 +120,11 @@ function loadEnv() {
     OTP_CODE_SEALER,
     OTP_DELIVERY_WORKER_OPTIONS,
     RateLimitService,
+    TokenService,
+    SessionService,
     OtpService,
     OtpDeliveryWorker,
+    AuthenticationGuard,
   ],
 })
 export class AuthModule {}

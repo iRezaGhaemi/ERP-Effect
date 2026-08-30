@@ -5,7 +5,7 @@ import {
   PermissionGuard,
 } from "@effect/access-control/server";
 import { AuditModule } from "@effect/audit/server";
-import { AuthModule } from "@effect/auth/server";
+import { AuthenticationGuard, AuthModule } from "@effect/auth/server";
 import { parseEnv } from "@effect-erp/config";
 import { createDataSource, DatabaseModule } from "@effect-erp/database";
 import { UsersModule } from "@effect/users/server";
@@ -27,6 +27,7 @@ import { HealthService } from "./health/health.service.js";
   controllers: [HealthController],
   providers: [
     HealthService,
+    { provide: APP_GUARD, useExisting: AuthenticationGuard },
     { provide: APP_GUARD, useExisting: PermissionGuard },
   ],
 })

@@ -1,14 +1,22 @@
-import { createHmac, randomInt, randomUUID } from "node:crypto";
+import {
+  createHmac,
+  randomInt,
+  randomUUID,
+  timingSafeEqual,
+} from "node:crypto";
 
 import { DomainError, type RequestContext } from "@effect-erp/contracts";
+import { UserEntity, UserStatus } from "@effect/users/entities";
 import { UsersFacade, normalizeIranianMobile } from "@effect/users/server";
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, Optional } from "@nestjs/common";
 import { DataSource } from "typeorm";
 
 import {
   RequestOtpSchema,
   type RequestOtpInput,
   type RequestOtpResponse,
+  VerifyOtpSchema,
+  type VerifyOtpInput,
 } from "../contracts/index.js";
 import { OtpChallengeEntity, OtpDeliveryJobEntity } from "../entities/index.js";
 import { AUTH_OPTIONS, type AuthOptions } from "./auth.options.js";
@@ -18,6 +26,7 @@ import {
   type OtpResponseEnvelope,
 } from "./otp-response-envelope.js";
 import { RateLimitService } from "./rate-limit.service.js";
+import { type AuthResult, SessionService } from "./session.service.js";
 
 function requestUnavailable(): DomainError {
   return new DomainError(
@@ -26,8 +35,16 @@ function requestUnavailable(): DomainError {
   );
 }
 
+function otpInvalid(): DomainError {
+  return new DomainError("OTP_INVALID", "کد تأیید نامعتبر است.");
+}
+
 const DECOY_PHONE = "+980000000000";
 const DECOY_REQUEST_IP = "0.0.0.0";
+const maxOtpAttempts = 5;
+
+type VerifyOutcome =
+  { status: "invalid" } | { status: "ok"; result: AuthResult };
 
 @Injectable()
 export class OtpService {
@@ -39,6 +56,7 @@ export class OtpService {
     @Inject(OTP_CODE_SEALER) private readonly codeSealer: OtpCodeSealer,
     @Inject(OTP_RESPONSE_ENVELOPE)
     private readonly responseEnvelope: OtpResponseEnvelope,
+    @Optional() private readonly sessions?: SessionService,
   ) {}
 
   async request(
@@ -74,6 +92,73 @@ export class OtpService {
         throw requestUnavailable();
       }
     });
+  }
+
+  async verify(
+    input: VerifyOtpInput,
+    context: RequestContext,
+  ): Promise<AuthResult> {
+    const sessions = this.sessions;
+    if (!sessions) throw otpInvalid();
+    const values = VerifyOtpSchema.parse(input);
+    const outcome = await this.dataSource.transaction<VerifyOutcome>(
+      async (manager) => {
+        const challenges = manager.getRepository(OtpChallengeEntity);
+        const challenge = await challenges.findOne({
+          where: { id: values.challengeId },
+          lock: { mode: "pessimistic_write" },
+        });
+        const now = new Date();
+        if (
+          !challenge ||
+          challenge.isDecoy ||
+          !challenge.userId ||
+          challenge.consumedAt ||
+          challenge.invalidatedAt ||
+          challenge.expiresAt <= now ||
+          challenge.attempts >= maxOtpAttempts
+        ) {
+          return { status: "invalid" };
+        }
+
+        const delivery = await manager
+          .getRepository(OtpDeliveryJobEntity)
+          .findOne({
+            where: { challengeId: challenge.id },
+            lock: { mode: "pessimistic_read" },
+          });
+        if (delivery?.status !== "SUCCEEDED") return { status: "invalid" };
+
+        const expectedHash = createHmac("sha256", this.options.pepper)
+          .update(`${challenge.id}:${values.code}`)
+          .digest("hex");
+        if (!timingSafeEqualHash(challenge.codeHash, expectedHash)) {
+          challenge.attempts += 1;
+          if (challenge.attempts >= maxOtpAttempts)
+            challenge.invalidatedAt = now;
+          await challenges.save(challenge);
+          return { status: "invalid" };
+        }
+
+        const user = await manager.getRepository(UserEntity).findOne({
+          where: { id: challenge.userId },
+          lock: { mode: "pessimistic_write" },
+        });
+        if (!user || user.status !== UserStatus.ACTIVE)
+          return { status: "invalid" };
+
+        user.lastLoginAt = now;
+        challenge.consumedAt = now;
+        await manager.getRepository(UserEntity).save(user);
+        await challenges.save(challenge);
+        return {
+          status: "ok",
+          result: await sessions.createForLogin(user, context, manager),
+        };
+      },
+    );
+    if (outcome.status === "invalid") throw otpInvalid();
+    return outcome.result;
   }
 
   private async persistDeliveryRecord(
@@ -137,4 +222,12 @@ export class OtpService {
       retryAfterSeconds: this.options.resendSeconds,
     };
   }
+}
+
+function timingSafeEqualHash(leftHex: string, rightHex: string): boolean {
+  const left = /^[a-f\d]{64}$/i.test(leftHex)
+    ? Buffer.from(leftHex, "hex")
+    : Buffer.alloc(32);
+  const right = Buffer.from(rightHex, "hex");
+  return left.length === right.length && timingSafeEqual(left, right);
 }

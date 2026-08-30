@@ -4,4 +4,4 @@ Set `OTP_DELIVERY_ACTIVATION_MARGIN_SECONDS` to the scheduling and database-acti
 
 The durable outbox provides at-least-once delivery. It sends the immutable delivery-job ID as `requestId`, so duplicate-SMS suppression depends on the configured SMS gateway treating that value as an idempotency key across retries. Production gateways must honor that contract; the current provider protocol does not independently guarantee deduplication.
 
-Terminal OTP rows are retained for 24 hours, then the worker removes them in batches of at most 500 at a one-minute cadence. Cleanup errors are logged without provider, OTP, or database details and do not stop delivery or audit processing.
+Terminal OTP rows are eligible for cleanup only after the challenge has expired and at least 24 hours have passed since terminal completion. The worker removes eligible rows in batches of at most 500 at a one-minute cadence. Cleanup errors are logged without provider, OTP, or database details and do not stop delivery or audit processing.
