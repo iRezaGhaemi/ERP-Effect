@@ -84,7 +84,7 @@ function domainStatus(code: string): number {
   return HttpStatus.UNPROCESSABLE_ENTITY;
 }
 
-function codeForStatus(status: number): string {
+function codeForStatus(status: HttpStatus): string {
   if (status === HttpStatus.BAD_REQUEST) return "BAD_REQUEST";
   if (status === HttpStatus.UNAUTHORIZED) return "AUTHENTICATION_REQUIRED";
   if (status === HttpStatus.FORBIDDEN) return "FORBIDDEN";
@@ -96,7 +96,7 @@ function codeForStatus(status: number): string {
   return "INTERNAL_SERVER_ERROR";
 }
 
-function messageForStatus(status: number): string {
+function messageForStatus(status: HttpStatus): string {
   if (status === HttpStatus.UNAUTHORIZED) return "احراز هویت لازم است.";
   if (status === HttpStatus.FORBIDDEN)
     return "دسترسی به این درخواست مجاز نیست.";

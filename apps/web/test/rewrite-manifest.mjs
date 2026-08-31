@@ -8,4 +8,4 @@ const manifest = JSON.parse(readFileSync(resolve(directory, '.next/routes-manife
 
 assert.equal(manifest.rewrites.afterFiles.length, 1);
 assert.equal(manifest.rewrites.afterFiles[0]?.source, '/api/:path*');
-assert.equal(manifest.rewrites.afterFiles[0]?.destination, 'http://api:3001/api/:path*');
+assert.equal(manifest.rewrites.afterFiles[0]?.destination, `${process.env.INTERNAL_API_URL ?? 'http://api:3001'}/api/:path*`);

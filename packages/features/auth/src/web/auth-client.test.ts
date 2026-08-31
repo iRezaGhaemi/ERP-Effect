@@ -28,7 +28,8 @@ describe("AuthClient", () => {
     expect(options.method).toBe("POST");
     expect(options.headers).toBeInstanceOf(Headers);
     expect((options.headers as Headers).get("content-type")).toBe("application/json");
-    expect(JSON.parse(String(options.body))).toEqual({ phone: "09121234567" });
+    expect(typeof options.body).toBe("string");
+    expect(JSON.parse(options.body as string)).toEqual({ phone: "09121234567" });
   });
 
   it("rejects an invalid success payload through its shared response schema", async () => {

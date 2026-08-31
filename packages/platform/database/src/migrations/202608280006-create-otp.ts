@@ -1,7 +1,7 @@
 import type { MigrationInterface, QueryRunner } from "typeorm";
 
 export class CreateOtp202608280006 implements MigrationInterface {
-  name = "CreateOtp202608280006";
+  name = "CreateOtp1787875200006";
 
   async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`

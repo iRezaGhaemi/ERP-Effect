@@ -1,7 +1,7 @@
 import type { MigrationInterface, QueryRunner } from "typeorm";
 
 export class CreateSessions202608280009 implements MigrationInterface {
-  name = "CreateSessions202608280009";
+  name = "CreateSessions1787875200009";
 
   async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`

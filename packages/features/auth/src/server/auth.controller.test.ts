@@ -84,7 +84,7 @@ describe("AuthController session cookies", () => {
     const body = await controller.verifyOtp(
       { challengeId: "761ff677-7c5e-414b-9565-e9d74082b0b7", code: "123456" },
       request,
-      response.response as never,
+      response.response,
     );
 
     expect(body).toEqual({
@@ -134,7 +134,7 @@ describe("AuthController session cookies", () => {
       authOptions,
     );
 
-    const body = await controller.refresh(request, response.response as never);
+    const body = await controller.refresh(request, response.response);
 
     expect(sessionService.refresh).toHaveBeenCalledWith(
       "refresh-secret",
@@ -183,7 +183,7 @@ describe("AuthController session cookies", () => {
       authOptions,
     );
 
-    await controller.logout(request, response.response as never);
+    await controller.logout(request, response.response);
 
     expect(sessionService.logout).toHaveBeenCalledWith(
       authResult.sessionId,

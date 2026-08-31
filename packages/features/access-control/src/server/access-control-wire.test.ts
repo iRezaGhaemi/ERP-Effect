@@ -18,7 +18,7 @@ function createRepository(): AccessControlRepository {
     hasRoleGrant: vi.fn(),
     listRolePermissionKeys: vi.fn(),
     listOverrideEffects: vi.fn(),
-  } as never;
+  };
 }
 
 function createRoleDataSource() {

@@ -27,7 +27,7 @@ function createResolver(overrides: Partial<AccessControlRepository> = {}) {
   return {
     repository,
     service: new AccessControlService(
-      repository as never,
+      repository,
       {} as never,
       {} as never,
     ),
@@ -62,7 +62,7 @@ function createSystemRoleService() {
   return {
     role,
     service: new AccessControlService(
-      repository as never,
+      repository,
       dataSource as never,
       { write: vi.fn() } as never,
     ),
@@ -161,7 +161,7 @@ describe("last active super-admin protection", () => {
     const dataSource = { transaction: vi.fn(async (work) => work(manager)) };
     const { repository } = createResolver();
     const service = new AccessControlService(
-      repository as never,
+      repository,
       dataSource as never,
       { write: vi.fn() } as never,
     );

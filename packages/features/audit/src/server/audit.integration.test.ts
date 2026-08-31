@@ -19,7 +19,7 @@ const dataSources: DataSource[] = [];
 
 afterEach(async () => {
   await Promise.all(
-    dataSources.splice(0).map(async (dataSource) => dataSource.destroy()),
+    dataSources.splice(0).filter((dataSource) => dataSource.isInitialized).map(async (dataSource) => dataSource.destroy()),
   );
 });
 
@@ -147,7 +147,7 @@ describe("audit history", () => {
       );
     } finally {
       await Promise.all(
-        dataSources.splice(0).map(async (dataSource) => dataSource.destroy()),
+        dataSources.splice(0).filter((dataSource) => dataSource.isInitialized).map(async (dataSource) => dataSource.destroy()),
       );
       await container.stop();
     }

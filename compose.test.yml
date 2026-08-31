@@ -1,0 +1,70 @@
+name: effect-identity-test
+
+x-api-build: &api-build
+  context: .
+  dockerfile: apps/api/Dockerfile
+  target: test-runner
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: effect_erp
+      POSTGRES_USER: effect_migrator
+      POSTGRES_PASSWORD: effect-migrator-development
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U effect_migrator -d effect_erp"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    volumes:
+      - /var/lib/postgresql/data
+      - ./infra/postgres/init-runtime-role.sql:/docker-entrypoint-initdb.d/10-runtime-role.sql:ro
+  migrate:
+    build: *api-build
+    command: ["node", "dist/migrate.js"]
+    environment:
+      DATABASE_MIGRATION_URL: postgres://effect_migrator:effect-migrator-development@postgres:5432/effect_erp
+    depends_on:
+      postgres: { condition: service_healthy }
+    healthcheck: { disable: true }
+    read_only: true
+  seed:
+    build: *api-build
+    command: ["node", "dist/seed.js"]
+    environment:
+      DATABASE_URL: postgres://effect:effect@postgres:5432/effect_erp
+      INITIAL_ADMIN_PHONE: "09121234567"
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    healthcheck: { disable: true }
+    read_only: true
+  api:
+    build: *api-build
+    environment:
+      NODE_ENV: test
+      API_PORT: 3001
+      DATABASE_URL: postgres://effect:effect@postgres:5432/effect_erp
+      WEB_ORIGIN: http://localhost:3100
+      INTERNAL_API_URL: http://api:3001
+      OTP_PEPPER: isolated-test-otp-pepper-at-least-32-characters
+      JWT_ACCESS_SECRET: isolated-test-jwt-secret-at-least-32-characters
+      SMS_PROVIDER: fake
+      INITIAL_ADMIN_PHONE: "09121234567"
+    depends_on:
+      seed: { condition: service_completed_successfully }
+    ports: ["127.0.0.1:3101:3001"]
+    read_only: true
+    tmpfs: [/tmp]
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args: { INTERNAL_API_URL: "http://api:3001" }
+    environment:
+      INTERNAL_API_URL: http://api:3001
+    depends_on:
+      api: { condition: service_healthy }
+    ports: ["127.0.0.1:3100:3000"]
+    read_only: true
+    tmpfs: [/tmp]

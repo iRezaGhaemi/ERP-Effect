@@ -11,8 +11,7 @@
   },
   "scripts": {
     "build": "tsc --noEmit --strict --noUncheckedIndexedAccess --exactOptionalPropertyTypes --noImplicitOverride --noFallthroughCasesInSwitch --forceConsistentCasingInFileNames --skipLibCheck --module NodeNext --moduleResolution NodeNext --target ES2024 --types node src/*.ts",
-    "typecheck": "pnpm run build",
-    "test": "vitest run --config vitest.config.ts"
+    "typecheck": "pnpm run build"
   },
   "dependencies": {
     "testcontainers": "^11.12.0"

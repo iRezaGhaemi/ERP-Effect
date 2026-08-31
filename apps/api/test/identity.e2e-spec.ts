@@ -121,7 +121,7 @@ async function createApp(): Promise<INestApplication> {
         createdAt: "2026-08-28T00:00:00.000Z",
         updatedAt: "2026-08-28T00:00:00.000Z",
       }),
-    } as Partial<UsersService>)
+    })
     .compile();
   app = module.createNestApplication();
   app.setGlobalPrefix("api/v1");

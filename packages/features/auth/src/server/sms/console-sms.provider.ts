@@ -22,5 +22,6 @@ export class ConsoleSmsProvider implements SmsProvider {
       recipient: "[Redacted]",
     });
     this.writeDevelopmentLine(`[DEV OTP] ${input.recipient} ${input.message}`);
+    return Promise.resolve();
   }
 }

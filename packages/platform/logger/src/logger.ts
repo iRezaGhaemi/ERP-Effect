@@ -26,7 +26,7 @@ const sensitiveKeys = new Set([
 ]);
 
 function isPlainObject(value: object): value is Record<string, unknown> {
-  const prototype = Object.getPrototypeOf(value);
+  const prototype: unknown = Object.getPrototypeOf(value);
   return prototype === Object.prototype || prototype === null;
 }
 
@@ -59,9 +59,9 @@ function redactNestedSecrets(value: unknown, seen = new WeakMap<object, unknown>
           return '[Redacted]';
         }
 
-        const nestedValue = Reflect.get(target, property, target);
+        const nestedValue: unknown = Reflect.get(target, property, target);
         if (target instanceof Date && typeof nestedValue === 'function') {
-          return nestedValue.bind(target);
+          return (nestedValue as (...args: unknown[]) => unknown).bind(target);
         }
 
         return redactNestedSecrets(nestedValue, seen);

@@ -3,3 +3,8 @@ packages:
   - packages/features/*
   - packages/platform/*
   - packages/shared/*
+
+# Native pnpm deploy derives a frozen production lockfile from this workspace.
+injectWorkspacePackages: true
+syncInjectedDepsAfterScripts:
+  - build

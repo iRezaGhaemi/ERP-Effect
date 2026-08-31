@@ -1,0 +1,43 @@
+name: Foundation and identity release gate
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - run: corepack enable
+      - id: pnpm-store
+        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+      - run: pnpm install --frozen-lockfile
+      - run: npm ci --prefix .testenv
+      - run: pnpm --filter @effect/web exec playwright install --with-deps chromium
+      - run: docker info
+      - run: docker compose -f compose.test.yml up -d --build --wait
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm test:integration
+      - run: pnpm test:e2e
+      - run: pnpm build
+      - run: pnpm --filter @effect/api openapi:generate && git diff --exit-code -- apps/api/openapi.json
+      - run: ./build.sh
+      - run: npm test --prefix .testenv
+      - run: git diff --check
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-failure-traces
+          path: apps/web/test-results/**/trace.zip
+          if-no-files-found: ignore
+      - if: always()
+        run: docker compose -f compose.test.yml down -v

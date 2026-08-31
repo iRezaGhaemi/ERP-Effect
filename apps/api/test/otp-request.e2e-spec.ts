@@ -31,7 +31,7 @@ const webOrigin = "http://localhost:3000";
 afterEach(async () => {
   if (app) await app.close();
   app = undefined;
-  await Promise.all(sources.splice(0).map((source) => source.destroy()));
+  await Promise.all(sources.splice(0).filter((source) => source.isInitialized).map((source) => source.destroy()));
 });
 
 describe("OTP request API", () => {
@@ -134,7 +134,7 @@ describe("OTP request API", () => {
       await module.get(OtpDeliveryWorker).runOnce();
       expect(sent).toHaveLength(1);
     } finally {
-      await Promise.all(sources.splice(0).map((source) => source.destroy()));
+      await Promise.all(sources.splice(0).filter((source) => source.isInitialized).map((source) => source.destroy()));
       await container.stop();
     }
   });

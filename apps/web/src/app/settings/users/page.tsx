@@ -3,7 +3,7 @@
 import { AccessClient, PermissionOverrides } from "@effect/access-control/web";
 import { AuthClient } from "@effect/auth/web";
 import { ApiError } from "@effect-erp/contracts";
-import { Button, TextField, AppShell } from "@effect/ui";
+import { Button, AppShell } from "@effect/ui";
 import { UserForm, UsersClient, UsersTable } from "@effect/users/web";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";

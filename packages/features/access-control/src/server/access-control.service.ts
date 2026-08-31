@@ -14,7 +14,6 @@ import {
   type CreateRoleInput,
   type PermissionEffect as PermissionEffectValue,
   type PermissionDto,
-  type PermissionKey,
   type ReplacePermissionOverridesInput,
   type RoleDto,
   type UpdateRoleInput,
@@ -200,7 +199,7 @@ export class AccessControlService {
       await this.repository.listRolePermissionKeys(userId),
     );
     for (const override of await this.repository.listOverrideEffects(userId)) {
-      if (override.effect === PermissionEffect.DENY)
+      if (override.effect === "DENY")
         effective.delete(override.key);
       else effective.add(override.key);
     }

@@ -55,11 +55,11 @@ function auditPendingJob() {
 }
 
 function successfulDataSource(job = claimedJob()) {
-  const claimQuery = vi.fn().mockResolvedValue([job]);
+  const claimQuery = vi.fn().mockResolvedValue([[job], 1]);
   const completionQuery = vi
     .fn()
-    .mockResolvedValueOnce([{ id: challengeId }])
-    .mockResolvedValueOnce([{ id: jobId }]);
+    .mockResolvedValueOnce([[{ id: challengeId }], 1])
+    .mockResolvedValueOnce([[{ id: jobId }], 1]);
   const transaction = vi
     .fn()
     .mockImplementationOnce(async (work) => work({ query: claimQuery }))
@@ -138,9 +138,9 @@ describe("OtpDeliveryWorker", () => {
   it("schedules a bounded retry after a transient provider failure", async () => {
     const job = claimedJob(1);
     const transaction = vi.fn(async (work) =>
-      work({ query: vi.fn().mockResolvedValue([job]) }),
+      work({ query: vi.fn().mockResolvedValue([[job], 1]) }),
     );
-    const query = vi.fn().mockResolvedValue([{ id: jobId }]);
+    const query = vi.fn().mockResolvedValue([[{ id: jobId }], 1]);
     const worker = new OtpDeliveryWorker(
       { transaction, query } as never,
       { send: vi.fn().mockRejectedValue(new Error("provider secret")) },
@@ -166,17 +166,17 @@ describe("OtpDeliveryWorker", () => {
   it("leaves the challenge invalid and audits safe metadata on terminal failure", async () => {
     const job = claimedJob(3);
     const audit = { write: vi.fn().mockResolvedValue(undefined) };
-    const claimQuery = vi.fn().mockResolvedValue([job]);
+    const claimQuery = vi.fn().mockResolvedValue([[job], 1]);
     const transaction = vi
       .fn()
       .mockImplementationOnce(async (work) => work({ query: claimQuery }))
       .mockImplementationOnce(async (work) =>
         work({
           marker: "audit-manager",
-          query: vi.fn().mockResolvedValue([{ id: jobId }]),
+          query: vi.fn().mockResolvedValue([[{ id: jobId }], 1]),
         }),
       );
-    const query = vi.fn().mockResolvedValue([{ id: jobId }]);
+    const query = vi.fn().mockResolvedValue([[{ id: jobId }], 1]);
     const worker = new OtpDeliveryWorker(
       { transaction, query } as never,
       { send: vi.fn().mockRejectedValue(new Error("provider secret")) },
@@ -211,12 +211,12 @@ describe("OtpDeliveryWorker", () => {
     const transaction = vi
       .fn()
       .mockImplementationOnce(async (work) =>
-        work({ query: vi.fn().mockResolvedValue([job]) }),
+        work({ query: vi.fn().mockResolvedValue([[job], 1]) }),
       )
       .mockImplementationOnce(async (work) =>
-        work({ query: vi.fn().mockResolvedValue([{ id: jobId }]) }),
+        work({ query: vi.fn().mockResolvedValue([[{ id: jobId }], 1]) }),
       );
-    const query = vi.fn().mockResolvedValue([{ id: jobId }]);
+    const query = vi.fn().mockResolvedValue([[{ id: jobId }], 1]);
     const sms = { send: vi.fn() };
     const worker = new OtpDeliveryWorker(
       { transaction, query } as never,
@@ -238,15 +238,15 @@ describe("OtpDeliveryWorker", () => {
     const transaction = vi
       .fn()
       .mockImplementationOnce(async (work) =>
-        work({ query: vi.fn().mockResolvedValue([job]) }),
+        work({ query: vi.fn().mockResolvedValue([[job], 1]) }),
       )
       .mockImplementationOnce(async (work) =>
-        work({ query: vi.fn().mockResolvedValue([]) }),
+        work({ query: vi.fn().mockResolvedValue([[], 0]) }),
       )
       .mockImplementationOnce(async (work) =>
-        work({ query: vi.fn().mockResolvedValue([{ id: jobId }]) }),
+        work({ query: vi.fn().mockResolvedValue([[{ id: jobId }], 1]) }),
       );
-    const query = vi.fn().mockResolvedValue([{ id: jobId }]);
+    const query = vi.fn().mockResolvedValue([[{ id: jobId }], 1]);
     const sms = { send: vi.fn().mockResolvedValue(undefined) };
     const worker = new OtpDeliveryWorker(
       { transaction, query } as never,
@@ -274,10 +274,10 @@ describe("OtpDeliveryWorker", () => {
     const transaction = vi
       .fn()
       .mockImplementationOnce(async (work) =>
-        work({ query: vi.fn().mockResolvedValue([job]) }),
+        work({ query: vi.fn().mockResolvedValue([[job], 1]) }),
       )
       .mockImplementationOnce(async (work) => work({}));
-    const query = vi.fn().mockResolvedValue([{ id: jobId }]);
+    const query = vi.fn().mockResolvedValue([[{ id: jobId }], 1]);
     const worker = new OtpDeliveryWorker(
       { transaction, query } as never,
       { send: vi.fn().mockRejectedValue(new Error("provider secret")) },
@@ -298,14 +298,14 @@ describe("OtpDeliveryWorker", () => {
   it("retries audit-pending terminalization without invoking the provider", async () => {
     const job = auditPendingJob();
     const audit = { write: vi.fn().mockResolvedValue(undefined) };
-    const finalizeQuery = vi.fn().mockResolvedValue([{ id: jobId }]);
+    const finalizeQuery = vi.fn().mockResolvedValue([[{ id: jobId }], 1]);
     const transaction = vi
       .fn()
       .mockImplementationOnce(async (work) =>
-        work({ query: vi.fn().mockResolvedValue([]) }),
+        work({ query: vi.fn().mockResolvedValue([[], 0]) }),
       )
       .mockImplementationOnce(async (work) =>
-        work({ query: vi.fn().mockResolvedValue([job]) }),
+        work({ query: vi.fn().mockResolvedValue([[job], 1]) }),
       )
       .mockImplementationOnce(async (work) => work({ query: finalizeQuery }));
     const sms = { send: vi.fn() };
@@ -349,12 +349,12 @@ describe("OtpDeliveryWorker", () => {
       const transaction = vi
         .fn()
         .mockImplementationOnce(async (work) =>
-          work({ query: vi.fn().mockResolvedValue([job]) }),
+          work({ query: vi.fn().mockResolvedValue([[job], 1]) }),
         )
         .mockImplementationOnce(async (work) =>
-          work({ query: vi.fn().mockResolvedValue([{ id: jobId }]) }),
+          work({ query: vi.fn().mockResolvedValue([[{ id: jobId }], 1]) }),
         );
-      const query = vi.fn().mockResolvedValue([{ id: jobId }]);
+      const query = vi.fn().mockResolvedValue([[{ id: jobId }], 1]);
       const sms = { send: vi.fn() };
       const worker = new OtpDeliveryWorker(
         { transaction, query } as never,
@@ -423,17 +423,19 @@ describe("OtpDeliveryWorker", () => {
             const candidate = await claim();
             claimedDelivery = Boolean(candidate);
             return work({
-              query: vi.fn().mockResolvedValue(candidate ? [candidate] : []),
+              query: vi
+                .fn()
+                .mockResolvedValue(candidate ? [[candidate], 1] : [[], 0]),
             });
           }
           if (!claimedDelivery) {
-            return work({ query: vi.fn().mockResolvedValue([]) });
+            return work({ query: vi.fn().mockResolvedValue([[], 0]) });
           }
           let queryCount = 0;
           return work({
             query: vi.fn().mockImplementation(() => {
               queryCount += 1;
-              return [{ id: queryCount === 1 ? challengeId : jobId }];
+              return [[{ id: queryCount === 1 ? challengeId : jobId }], 1];
             }),
           });
         }),
@@ -508,7 +510,7 @@ describe("OtpDeliveryWorker", () => {
     vi.useFakeTimers();
     try {
       const transaction = vi.fn(async (work) =>
-        work({ query: vi.fn().mockResolvedValue([]) }),
+        work({ query: vi.fn().mockResolvedValue([[], 0]) }),
       );
       const query = vi.fn().mockResolvedValue([{ deletedCount: "0" }]);
       const worker = new OtpDeliveryWorker(
@@ -548,16 +550,16 @@ describe("OtpDeliveryWorker", () => {
       const transaction = vi.fn(async (work) => {
         transactionCount += 1;
         if (transactionCount === 1) {
-          return work({ query: vi.fn().mockResolvedValue([job]) });
+          return work({ query: vi.fn().mockResolvedValue([[job], 1]) });
         }
         if (transactionCount === 2) {
           const completed = vi
             .fn()
-            .mockResolvedValueOnce([{ id: challengeId }])
-            .mockResolvedValueOnce([{ id: jobId }]);
+            .mockResolvedValueOnce([[{ id: challengeId }], 1])
+            .mockResolvedValueOnce([[{ id: jobId }], 1]);
           return work({ query: completed });
         }
-        return work({ query: vi.fn().mockResolvedValue([]) });
+        return work({ query: vi.fn().mockResolvedValue([[], 0]) });
       });
       const worker = new OtpDeliveryWorker(
         {
@@ -600,15 +602,15 @@ describe("OtpDeliveryWorker", () => {
           query: vi.fn().mockImplementation((statement: string) => {
             if (statement.includes(`"status" = 'PENDING'`)) {
               deliveryClaimCount += 1;
-              return deliveryClaimCount === 2 ? [job] : [];
+              return deliveryClaimCount === 2 ? [[job], 1] : [[], 0];
             }
             if (statement.includes(`UPDATE "otp_challenges"`)) {
-              return [{ id: challengeId }];
+              return [[{ id: challengeId }], 1];
             }
             if (statement.includes(`"status" = 'SUCCEEDED'`)) {
-              return [{ id: jobId }];
+              return [[{ id: jobId }], 1];
             }
-            return [];
+            return [[], 0];
           }),
         });
       });

@@ -126,7 +126,7 @@ export function LoginForm({ client = new AuthClient(), onAuthenticated }: {
 
   if (challengeId) {
     return (
-      <form className="effect-login-form" onSubmit={verifyCode} noValidate>
+      <form className="effect-login-form" onSubmit={(event) => void verifyCode(event)} noValidate>
         <div className="effect-login-brand"><span className="effect-brand__mark">E</span><h1>کد تأیید را وارد کنید</h1></div>
         <p className="effect-login-copy">کد تأیید ۶ رقمی به شماره <b dir="ltr">{phone}</b> ارسال شد.</p>
         <div className="effect-otp-row" dir="ltr">

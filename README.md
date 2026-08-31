@@ -1,5 +1,105 @@
 # Effect ERP — پروتوتایپ رابط کاربری
 
+> **وضعیت فعلی: checkpoint توسعه، نه نسخه آماده انتشار.** طبق تصمیم جدید، ورود محصول باید با نام‌کاربری و رمز عبور باشد و OTP حذف شود. این تغییر هنوز پیاده‌سازی نشده؛ کد فعلی برای حفظ پیشرفت تا این مرحله ثبت شده است. اجرای کامل پذیرش نهایی نشده و تست مرورگر فعلی یک خطای selector شناخته‌شده دارد. جزئیات در [گزارش وضعیت](docs/progress/2026-08-31-foundation-checkpoint.md).
+
+## Foundation and identity — Phase 1
+
+The pnpm workspace implements single-company OTP login, users, roles,
+permissions/overrides, sessions, and append-only audit history.
+**CRM, finance, tasks, leave, messenger, and reports remain prototype-only.**
+The standalone demo below is preserved; its demo OTP is not an API credential.
+
+### Development
+
+Prerequisites: Node **24.x**, Corepack, Docker with Compose v2, and Git.
+
+```bash
+corepack enable
+cp .env.example .env
+pnpm install --frozen-lockfile
+docker compose up --build
+```
+
+Open http://localhost:3000/login. Compose starts PostgreSQL, runs a separate
+migration job and idempotent initial-admin seed, then starts API and web.
+Set `INITIAL_ADMIN_PHONE`, `OTP_PEPPER`, and `JWT_ACCESS_SECRET` in `.env`;
+defaults are development examples only. Retrieve the local OTP with
+`docker compose logs -f api`: only the explicitly development-only `[DEV OTP]`
+console line contains it. The six OTP digit inputs accept typing/paste.
+No SMS inspection endpoint is built into development or production.
+
+```bash
+docker compose run --rm migrate
+docker compose run --rm seed
+# Alternatively, after building, with host-accessible URLs in the environment:
+pnpm db:migrate
+pnpm db:seed
+```
+
+`DATABASE_MIGRATION_URL` uses the privileged migration role; `DATABASE_URL`
+uses the restricted runtime role. API startup rejects a superuser/schema-owner
+runtime connection. Never point tests at application databases.
+
+### Release gate
+
+```bash
+pnpm --filter @effect/web exec playwright install --with-deps chromium
+npm ci --prefix .testenv
+docker compose -f compose.test.yml up -d --build --wait
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm test:integration
+pnpm test:e2e
+pnpm build
+./build.sh
+npm test --prefix .testenv
+docker compose -f compose.test.yml down -v
+git diff --check
+```
+
+The test stack uses localhost ports **3100/3101** and an anonymous disposable
+PostgreSQL volume. Always run its `down -v`, including after failure. Integration
+and API tests create separate disposable PostgreSQL containers. Run the browser
+journey on a fresh stack; it keeps the real 60-second resend policy and revokes
+a second independent session. The dedicated test API image uses `NODE_ENV=test`
+and fake SMS; its `/api/v1/test/sms/latest` endpoint replaces log scraping.
+Failure traces contain isolated fixture credentials: never run these tests on
+live accounts. CI caches only pnpm store data and uploads traces only on failure.
+
+Generate OpenAPI with `pnpm --filter @effect/api openapi:generate` and verify
+`git diff --exit-code -- apps/api/openapi.json`.
+
+### Production images and deployment
+
+```bash
+docker build -f apps/api/Dockerfile --target runner -t effect-api:release .
+docker build -f apps/web/Dockerfile --build-arg INTERNAL_API_URL=http://api:3001 -t effect-web:release .
+# Inject migration credentials separately through your deployment secret store:
+docker run --rm --env-file /secure/path/migration.env effect-api:release node dist/migrate.js
+# Inject restricted DATABASE_URL and INITIAL_ADMIN_PHONE:
+docker run --rm --env-file /secure/path/seed.env effect-api:release node dist/seed.js
+```
+
+**Take and verify a restorable PostgreSQL backup before every migration.**
+Run migration once as a controlled job before replacing API replicas; API startup
+never runs migrations. Keep migration credentials away from runtime replicas.
+Both images run non-root with root-owned read-only application files. Deploy
+with `--read-only --tmpfs /tmp`. Readiness checks database connectivity; liveness
+checks the process. Web includes Next standalone output, public fonts and artwork.
+`INTERNAL_API_URL` is a web build argument as well as a server-side environment
+variable: build for the deployment's internal API address.
+
+Terminate HTTPS at a trusted same-origin reverse proxy. Set `NODE_ENV=production`,
+`WEB_ORIGIN` to the public HTTPS origin, secrets of at least 32 characters,
+`SMS_PROVIDER=http`, `SMS_HTTP_URL`, `SMS_HTTP_TOKEN`, and
+`OTP_DELIVERY_ACTIVATION_MARGIN_SECONDS=5`. Production rejects console/fake SMS
+and insecure cookies. Keep `synchronize:false`; never log raw OTP, cookies or
+tokens. Authentication cookies are HttpOnly/Secure, and mutations require Origin
+and CSRF. Do not expose the internal API directly to browsers.
+
+---
+
 **سیستم‌عامل کسب‌وکار استودیو اثر** · نسخه ۲.۶ (پروتوتایپ Hi-Fi)
 
 > **نسخه جاری ۲.۶:** تم پیش‌فرض **روشن** · رنگ برند اصلی **#6F6AEB** · فونت **IRANSansX** · مدیریت پیشرفته تسک، مسئولین چندگانه و چک‌لیست ساختاریافته

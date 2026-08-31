@@ -39,7 +39,7 @@ function createSeedHarness(): { dataSource: DataSource; state: SeedState } {
     userRoles: [],
     audits: [],
   };
-  const rowsFor = (entity: Function): object[] => {
+  const rowsFor = (entity: new () => object): object[] => {
     if (entity === PermissionEntity) return state.permissions;
     if (entity === RoleEntity) return state.roles;
     if (entity === UserEntity) return state.users;
@@ -48,7 +48,7 @@ function createSeedHarness(): { dataSource: DataSource; state: SeedState } {
     if (entity === AuditLogEntity) return state.audits;
     throw new Error(`Unsupported repository: ${entity.name}`);
   };
-  const repositoryFor = (entity: Function) => {
+  const repositoryFor = (entity: new () => object) => {
     const rows = rowsFor(entity);
     return {
       countBy: async (
@@ -72,7 +72,7 @@ function createSeedHarness(): { dataSource: DataSource; state: SeedState } {
           ),
         ),
       create: (values: Record<string, unknown>) =>
-        Object.assign(new (entity as new () => object)(), values, {
+        Object.assign(new (entity)(), values, {
           id: "id" in values ? values.id : randomUUID(),
         }),
       save: async (row: Record<string, unknown>) => {
@@ -103,7 +103,7 @@ function createSeedHarness(): { dataSource: DataSource; state: SeedState } {
           if (row) Object.assign(row, value);
           else
             rows.push(
-              Object.assign(new (entity as new () => object)(), value, {
+              Object.assign(new (entity)(), value, {
                 id: randomUUID(),
                 createdAt: new Date("2026-08-28T00:00:00.000Z"),
               }),
@@ -123,11 +123,11 @@ function createSeedHarness(): { dataSource: DataSource; state: SeedState } {
     query: async () => [],
     getRepository: repositoryFor,
     createQueryBuilder: () => {
-      let entity: Function;
+      let entity: new () => object;
       let values: Record<string, unknown> | Record<string, unknown>[];
       const builder = {
         insert: () => builder,
-        into: (next: Function) => {
+        into: (next: new () => object) => {
           entity = next;
           return builder;
         },
@@ -138,7 +138,7 @@ function createSeedHarness(): { dataSource: DataSource; state: SeedState } {
         orIgnore: () => builder,
         execute: async () => {
           const rows = rowsFor(entity!);
-          for (const value of Array.isArray(values!) ? values! : [values!]) {
+          for (const value of Array.isArray(values!) ? values : [values]) {
             if (!rows.some((row) => matches(row, value)))
               rows.push({ ...value });
           }
@@ -179,7 +179,7 @@ describe("initial access seed", () => {
     state.rolePermissions.push({
       roleId: role.id,
       permissionId: unexpectedPermission.id,
-    } as RolePermissionEntity);
+    });
     role.name = "نام خراب";
     const corruptedPermission = state.permissions.find(
       ({ id }) => id === removedGrant.permissionId,

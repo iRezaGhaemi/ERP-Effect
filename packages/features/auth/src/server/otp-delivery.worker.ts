@@ -105,7 +105,7 @@ export class OtpDeliveryWorker
   }
 
   async cleanupTerminalRows(): Promise<number> {
-    const rows = (await this.dataSource.query(
+    const rows = await this.dataSource.query<Array<{ deletedCount: string }>>(
       `
         WITH expired AS (
           SELECT challenge."id"
@@ -126,7 +126,7 @@ export class OtpDeliveryWorker
         SELECT COUNT(*)::text AS "deletedCount" FROM deleted
       `,
       [this.options.terminalRetentionSeconds, this.options.cleanupBatchSize],
-    )) as Array<{ deletedCount: string }>;
+    );
     return Number(rows[0]?.deletedCount ?? 0);
   }
 
@@ -204,7 +204,7 @@ export class OtpDeliveryWorker
   private async claimNextDelivery(): Promise<ClaimedOtpDeliveryJob | null> {
     const leaseToken = randomUUID();
     return this.dataSource.transaction(async (manager) => {
-      const rows = (await manager.query(
+      const [rows] = await manager.query<[ClaimedOtpDeliveryJob[], number]>(
         `
           WITH candidate AS (
             SELECT "id"
@@ -241,7 +241,7 @@ export class OtpDeliveryWorker
             (SELECT host(challenge."request_ip") FROM "otp_challenges" challenge WHERE challenge."id" = job."challenge_id") AS "requestIp"
         `,
         [this.options.leaseSeconds, leaseToken],
-      )) as ClaimedOtpDeliveryJob[];
+      );
       return rows[0] ?? null;
     });
   }
@@ -249,7 +249,7 @@ export class OtpDeliveryWorker
   private async claimNextAuditPending(): Promise<ClaimedOtpAuditJob | null> {
     const leaseToken = randomUUID();
     return this.dataSource.transaction(async (manager) => {
-      const rows = (await manager.query(
+      const [rows] = await manager.query<[ClaimedOtpAuditJob[], number]>(
         `
           WITH candidate AS (
             SELECT "id"
@@ -279,7 +279,7 @@ export class OtpDeliveryWorker
             (SELECT host(challenge."request_ip") FROM "otp_challenges" challenge WHERE challenge."id" = job."challenge_id") AS "requestIp"
         `,
         [this.options.leaseSeconds, leaseToken],
-      )) as ClaimedOtpAuditJob[];
+      );
       return rows[0] ?? null;
     });
   }
@@ -308,7 +308,7 @@ export class OtpDeliveryWorker
 
   private async activateAndComplete(job: ClaimedOtpDeliveryJob): Promise<void> {
     await this.dataSource.transaction(async (manager) => {
-      const activated = (await manager.query(
+      const [activated] = await manager.query<[Array<{ id: string }>, number]>(
         `
           UPDATE "otp_challenges"
           SET "invalidated_at" = NULL
@@ -320,11 +320,11 @@ export class OtpDeliveryWorker
           RETURNING "id"
         `,
         [job.challengeId],
-      )) as Array<{ id: string }>;
+      );
       if (activated.length !== 1 || activated[0]?.id !== job.challengeId) {
         throw new Error("OTP challenge activation failed.");
       }
-      const completed = (await manager.query(
+      const [completed] = await manager.query<[Array<{ id: string }>, number]>(
         `
           UPDATE "otp_delivery_jobs"
           SET
@@ -345,7 +345,7 @@ export class OtpDeliveryWorker
           RETURNING "id"
         `,
         [job.id, job.challengeId, job.leaseToken, job.claimVersion],
-      )) as Array<{ id: string }>;
+      );
       if (completed.length !== 1) {
         throw new Error("OTP delivery completion failed.");
       }
@@ -363,7 +363,7 @@ export class OtpDeliveryWorker
   private async moveToAuditPending(
     job: ClaimedOtpDeliveryJob,
   ): Promise<boolean> {
-    const rows = (await this.dataSource.query(
+    const [rows] = await this.dataSource.query<[Array<{ id: string }>, number]>(
       `
         UPDATE "otp_delivery_jobs"
         SET
@@ -382,7 +382,7 @@ export class OtpDeliveryWorker
         RETURNING "id"
       `,
       [job.id, job.challengeId, job.leaseToken, job.claimVersion],
-    )) as Array<{ id: string }>;
+    );
     return rows.length === 1;
   }
 
@@ -401,7 +401,9 @@ export class OtpDeliveryWorker
           },
           manager,
         );
-        const finalized = (await manager.query(
+        const [finalized] = await manager.query<
+          [Array<{ id: string }>, number]
+        >(
           `
             UPDATE "otp_delivery_jobs"
             SET
@@ -422,7 +424,7 @@ export class OtpDeliveryWorker
             RETURNING "id"
           `,
           [job.id, job.challengeId, job.leaseToken, job.claimVersion],
-        )) as Array<{ id: string }>;
+        );
         if (finalized.length !== 1) {
           throw new Error("OTP delivery terminalization failed.");
         }

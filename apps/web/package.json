@@ -8,6 +8,7 @@
     "dev": "next dev",
     "start": "next start",
     "test": "vitest run --config vitest.config.ts",
+    "test:e2e": "playwright test",
     "test:rewrite": "INTERNAL_API_URL=http://api:3001 pnpm run build && node test/rewrite-manifest.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
@@ -23,6 +24,7 @@
     "react-dom": "^19.2.8"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@testing-library/react": "^16.3.2",
     "@types/node": "^24.0.0",
     "@types/react": "^19.2.14",

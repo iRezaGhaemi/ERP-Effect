@@ -16,7 +16,7 @@ import {
 import { AuditLogEntity } from "@effect/audit/entities";
 import { UserEntity } from "@effect/users/entities";
 
-export const entityRegistry: Array<Function | EntitySchema> = [
+export const entityRegistry: Array<(new () => object) | EntitySchema> = [
   OtpChallengeEntity,
   OtpDeliveryJobEntity,
   RateLimitBucketEntity,

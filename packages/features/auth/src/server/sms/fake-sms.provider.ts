@@ -5,5 +5,6 @@ export class FakeSmsProvider implements SmsProvider {
 
   async send(input: SmsMessage): Promise<void> {
     this.sent.push({ ...input });
+    return Promise.resolve();
   }
 }

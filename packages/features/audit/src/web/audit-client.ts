@@ -1,5 +1,4 @@
 import { ApiError, ErrorEnvelopeSchema } from "@effect-erp/contracts";
-import { z } from "zod";
 
 import { AuditLogPageSchema, AuditQuerySchema, type AuditQuery } from "../contracts/index.js";
 
@@ -9,7 +8,7 @@ export class AuditClient {
   async list(query: Partial<AuditQuery> = {}) {
     const parsed = AuditQuerySchema.parse(query);
     const response = await fetch(`/api/v1/audit-logs?page=${parsed.page}&pageSize=${parsed.pageSize}`, { credentials: "include" });
-    const body = await response.json().catch(() => undefined);
+    const body: unknown = await response.json().catch(() => undefined);
     if (!response.ok) throw toApiError(body);
     return AuditLogPageSchema.parse(body);
   }

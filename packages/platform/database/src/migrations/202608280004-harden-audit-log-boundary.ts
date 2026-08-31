@@ -1,7 +1,7 @@
 import type { MigrationInterface, QueryRunner } from "typeorm";
 
 export class HardenAuditLogBoundary202608280004 implements MigrationInterface {
-  name = "HardenAuditLogBoundary202608280004";
+  name = "HardenAuditLogBoundary1787875200004";
 
   async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(

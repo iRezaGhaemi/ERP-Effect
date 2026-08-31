@@ -14,7 +14,7 @@ import { CreateAccessControl202608280005 } from "../../../../platform/database/s
 
 const sources: DataSource[] = [];
 afterEach(async () => {
-  await Promise.all(sources.splice(0).map((source) => source.destroy()));
+  await Promise.all(sources.splice(0).filter((source) => source.isInitialized).map((source) => source.destroy()));
 });
 
 describe("access control persistence", () => {
@@ -127,7 +127,7 @@ describe("access control persistence", () => {
       expect(repairAudit.count).toBe(1);
       expect(extraGrant.count).toBe(0);
     } finally {
-      await Promise.all(sources.splice(0).map((source) => source.destroy()));
+      await Promise.all(sources.splice(0).filter((source) => source.isInitialized).map((source) => source.destroy()));
       await container.stop();
     }
   });

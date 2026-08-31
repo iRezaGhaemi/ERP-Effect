@@ -9,7 +9,7 @@ import { CreateUsers202608280001 } from '../../../../platform/database/src/migra
 const dataSources: DataSource[] = [];
 
 afterEach(async () => {
-  await Promise.all(dataSources.splice(0).map(async (dataSource) => dataSource.destroy()));
+  await Promise.all(dataSources.splice(0).filter((dataSource) => dataSource.isInitialized).map(async (dataSource) => dataSource.destroy()));
 });
 
 async function runFreshMigrationSuite(): Promise<void> {
@@ -43,7 +43,7 @@ async function runFreshMigrationSuite(): Promise<void> {
       ),
     ).rejects.toMatchObject({ code: '23505' });
   } finally {
-    await dataSource.destroy();
+    if (dataSource.isInitialized) await dataSource.destroy();
     const index = dataSources.indexOf(dataSource);
     if (index >= 0) dataSources.splice(index, 1);
     await container.stop();

@@ -1,12 +1,29 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "tasks": {
+    "@effect-erp/testing#build": { "outputs": [] },
+    "@effect/web#build": {
+      "dependsOn": ["^build"],
+      "env": ["INTERNAL_API_URL"],
+      "outputs": [".next/**", "!.next/cache/**"]
+    },
     "dev": { "cache": false, "persistent": true },
-    "build": { "dependsOn": ["^build"], "outputs": ["dist/**", ".next/**", "!.next/cache/**"] },
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
+    },
     "lint": { "dependsOn": ["^lint"], "outputs": [] },
-    "typecheck": { "dependsOn": ["^typecheck"], "outputs": [] },
+    "typecheck": { "dependsOn": ["^build"], "outputs": [] },
     "test": { "dependsOn": ["^build"], "outputs": ["coverage/**"] },
-    "test:integration": { "dependsOn": ["^build"], "cache": false, "outputs": [] },
-    "test:e2e": { "dependsOn": ["^build"], "cache": false, "outputs": ["playwright-report/**", "test-results/**"] }
+    "test:integration": {
+      "dependsOn": ["^build"],
+      "cache": false,
+      "outputs": []
+    },
+    "test:e2e": {
+      "dependsOn": ["^build"],
+      "cache": false,
+      "outputs": ["playwright-report/**", "test-results/**"]
+    }
   }
 }

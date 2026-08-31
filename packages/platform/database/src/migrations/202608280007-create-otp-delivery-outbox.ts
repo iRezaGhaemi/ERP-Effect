@@ -1,7 +1,7 @@
 import type { MigrationInterface, QueryRunner } from "typeorm";
 
 export class CreateOtpDeliveryOutbox202608280007 implements MigrationInterface {
-  name = "CreateOtpDeliveryOutbox202608280007";
+  name = "CreateOtpDeliveryOutbox1787875200007";
 
   async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`

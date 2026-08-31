@@ -1,7 +1,7 @@
 import type { MigrationInterface, QueryRunner } from "typeorm";
 
 export class CreateAccessControl202608280005 implements MigrationInterface {
-  name = "CreateAccessControl202608280005";
+  name = "CreateAccessControl1787875200005";
   async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
       `CREATE TYPE "permission_effect" AS ENUM ('ALLOW', 'DENY')`,

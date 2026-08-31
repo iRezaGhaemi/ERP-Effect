@@ -24,7 +24,7 @@ async function isApiReady(): Promise<boolean> {
     const response = await fetch(new URL('/api/v1/health/ready', internalApiUrl), {
       cache: 'no-store',
     });
-    const health = await response.json();
+    const health: unknown = await response.json();
 
     return response.ok && isReadyHealthResponse(health);
   } catch {

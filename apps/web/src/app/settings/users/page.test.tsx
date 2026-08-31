@@ -29,7 +29,7 @@ afterEach(() => {
 describe("UsersPage", () => {
   it("shows the last-super-admin error when suspension is rejected by the user administration drawer", async () => {
     vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request) => {
-      const url = String(input);
+      const url = input instanceof Request ? input.url : String(input);
       if (url.endsWith("/api/v1/me")) return response({ user, permissions: ["users:read", "users:suspend", "roles:manage"] });
       if (url.includes("/api/v1/users?") ) return response({ items: [user], meta: { page: 1, pageSize: 20, total: 1, pageCount: 1 } });
       if (url.endsWith(`/api/v1/users/${user.id}`)) return response({ ...user, roleIds: ["a53f8cb7-bb32-4adc-a835-6c1df8bd18ad"], permissionOverrides: [] });

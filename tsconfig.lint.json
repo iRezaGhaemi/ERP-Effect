@@ -1,0 +1,41 @@
+{
+  "extends": "./packages/shared/typescript-config/nest.json",
+  "compilerOptions": {
+    "target": "ES2024",
+    "noEmit": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "rootDir": ".",
+    "allowJs": true,
+    "paths": {
+      "@effect/auth/*": ["./packages/features/auth/src/*/index.ts"],
+      "@effect/users/*": ["./packages/features/users/src/*/index.ts"],
+      "@effect/audit/*": ["./packages/features/audit/src/*/index.ts"],
+      "@effect/access-control/*": [
+        "./packages/features/access-control/src/*/index.ts"
+      ],
+      "@effect/ui": ["./packages/shared/ui/src/index.ts"],
+      "@effect-erp/contracts": ["./packages/shared/contracts/src/index.ts"],
+      "@effect-erp/contracts/server": [
+        "./packages/shared/contracts/src/server/index.ts"
+      ],
+      "@effect-erp/config": ["./packages/platform/config/src/index.ts"],
+      "@effect-erp/database": ["./packages/platform/database/src/index.ts"],
+      "@effect-erp/logger": ["./packages/platform/logger/src/index.ts"],
+      "@effect-erp/testing": ["./packages/platform/testing/src/index.ts"]
+    }
+  },
+  "include": [
+    "apps/**/*.ts",
+    "apps/**/*.tsx",
+    "packages/**/*.ts",
+    "packages/**/*.tsx"
+  ],
+  "exclude": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/dist-test/**",
+    "**/.next/**"
+  ]
+}

@@ -37,7 +37,7 @@ const webOrigin = "http://localhost:3000";
 afterEach(async () => {
   if (app) await app.close();
   app = undefined;
-  await Promise.all(sources.splice(0).map((source) => source.destroy()));
+  await Promise.all(sources.splice(0).filter((source) => source.isInitialized).map((source) => source.destroy()));
 });
 
 function cookieHeader(setCookies: string[] | string | undefined): string {
@@ -185,7 +185,7 @@ describe("auth session API", () => {
         .set("Cookie", authCookies)
         .expect(401);
     } finally {
-      await Promise.all(sources.splice(0).map((source) => source.destroy()));
+      await Promise.all(sources.splice(0).filter((source) => source.isInitialized).map((source) => source.destroy()));
       await container.stop();
     }
   });

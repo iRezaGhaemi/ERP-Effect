@@ -24,7 +24,7 @@ export class UsersClient {
     const request: RequestInit = { method: options.method ?? "GET", credentials: "include", headers };
     if (options.body !== undefined) request.body = JSON.stringify(options.body);
     const response = await fetch(`/api/v1${path}`, request);
-    const body = await response.json().catch(() => undefined);
+    const body: unknown = await response.json().catch(() => undefined);
     if (!response.ok) throw toApiError(body);
     return schema.parse(body);
   }

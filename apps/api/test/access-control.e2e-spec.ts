@@ -62,12 +62,12 @@ class TestingAuthenticationGuard implements CanActivate {
 const sources: DataSource[] = [];
 let app: INestApplication | undefined;
 const webOrigin = "http://localhost:3000";
-const csrfToken = "access-control-e2e-csrf";
+const csrfToken = "a".repeat(43);
 const csrfCookie = `effect_csrf=${csrfToken}`;
 afterEach(async () => {
   if (app) await app.close();
   app = undefined;
-  await Promise.all(sources.splice(0).map((source) => source.destroy()));
+  await Promise.all(sources.splice(0).filter((source) => source.isInitialized).map((source) => source.destroy()));
 });
 
 describe("access-control API", () => {
@@ -240,7 +240,7 @@ describe("access-control API", () => {
         .expect(200);
       expect(() => AuditLogPageSchema.parse(auditLogs.body)).not.toThrow();
     } finally {
-      await Promise.all(sources.splice(0).map((source) => source.destroy()));
+      await Promise.all(sources.splice(0).filter((source) => source.isInitialized).map((source) => source.destroy()));
       await container.stop();
     }
   });

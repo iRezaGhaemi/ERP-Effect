@@ -38,7 +38,12 @@ const options = {
 };
 
 afterEach(async () => {
-  await Promise.all(dataSources.splice(0).map((source) => source.destroy()));
+  await Promise.all(
+    dataSources
+      .splice(0)
+      .filter((source) => source.isInitialized)
+      .map((source) => source.destroy()),
+  );
 });
 
 async function prepareDatabase(): Promise<{
@@ -46,62 +51,79 @@ async function prepareDatabase(): Promise<{
   stop: () => Promise<void>;
 }> {
   const container = await startPostgresContainer();
-  const migrator = new DataSource({
-    type: "postgres",
-    host: container.getHost(),
-    port: container.getMappedPort(5432),
-    username: "effect",
-    password: "effect",
-    database: "effect_erp",
-    entities: entityRegistry,
-    migrations: [
-      CreateUsers202608280001,
-      CreateAuditLogs202608280002,
-      ReconcileAuditLogsActorNull202608280003,
-      HardenAuditLogBoundary202608280004,
-      CreateAccessControl202608280005,
-      CreateOtp202608280006,
-      CreateOtpDeliveryOutbox202608280007,
-      HardenOtpDeliveryOutbox202608280008,
-      CreateSessions202608280009,
-    ],
-    synchronize: false,
-  });
-  dataSources.push(migrator);
-  await migrator.initialize();
-  await migrator.query(
-    `CREATE ROLE effect_runtime LOGIN PASSWORD 'runtime' NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS`,
-  );
-  await migrator.query(
-    `GRANT CONNECT ON DATABASE effect_erp TO effect_runtime`,
-  );
-  await migrator.query(`GRANT USAGE ON SCHEMA public TO effect_runtime`);
-  await migrator.query(
-    `ALTER DEFAULT PRIVILEGES FOR ROLE effect IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO effect_runtime`,
-  );
-  await migrator.runMigrations();
+  try {
+    const migrator = new DataSource({
+      type: "postgres",
+      host: container.getHost(),
+      port: container.getMappedPort(5432),
+      username: "effect",
+      password: "effect",
+      database: "effect_erp",
+      entities: entityRegistry,
+      migrations: [
+        CreateUsers202608280001,
+        CreateAuditLogs202608280002,
+        ReconcileAuditLogsActorNull202608280003,
+        HardenAuditLogBoundary202608280004,
+        CreateAccessControl202608280005,
+        CreateOtp202608280006,
+        CreateOtpDeliveryOutbox202608280007,
+        HardenOtpDeliveryOutbox202608280008,
+        CreateSessions202608280009,
+      ],
+      synchronize: false,
+    });
+    dataSources.push(migrator);
+    await migrator.initialize();
+    await migrator.query(
+      `CREATE ROLE effect_runtime LOGIN PASSWORD 'runtime' NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS`,
+    );
+    await migrator.query(
+      `GRANT CONNECT ON DATABASE effect_erp TO effect_runtime`,
+    );
+    await migrator.query(`GRANT USAGE ON SCHEMA public TO effect_runtime`);
+    await migrator.query(
+      `ALTER DEFAULT PRIVILEGES FOR ROLE effect IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO effect_runtime`,
+    );
+    await migrator.runMigrations();
 
-  const runtime = new DataSource({
-    type: "postgres",
-    host: container.getHost(),
-    port: container.getMappedPort(5432),
-    username: "effect_runtime",
-    password: "runtime",
-    database: "effect_erp",
-    entities: entityRegistry,
-    synchronize: false,
-  });
-  dataSources.push(runtime);
-  await runtime.initialize();
-  return {
-    runtime,
-    stop: async () => {
+    const runtime = new DataSource({
+      type: "postgres",
+      host: container.getHost(),
+      port: container.getMappedPort(5432),
+      username: "effect_runtime",
+      password: "runtime",
+      database: "effect_erp",
+      entities: entityRegistry,
+      synchronize: false,
+    });
+    dataSources.push(runtime);
+    await runtime.initialize();
+    return {
+      runtime,
+      stop: async () => {
+        await Promise.all(
+          dataSources
+            .splice(0)
+            .filter((source) => source.isInitialized)
+            .map((source) => source.destroy()),
+        );
+        await container.stop();
+      },
+    };
+  } catch (error) {
+    try {
       await Promise.all(
-        dataSources.splice(0).map((source) => source.destroy()),
+        dataSources
+          .splice(0)
+          .filter((source) => source.isInitialized)
+          .map((source) => source.destroy()),
       );
+    } finally {
       await container.stop();
-    },
-  };
+    }
+    throw error;
+  }
 }
 
 function otpHash(challengeId: string, code: string): string {

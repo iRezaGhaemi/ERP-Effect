@@ -1,7 +1,7 @@
 import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class ReconcileAuditLogsActorNull202608280003 implements MigrationInterface {
-  name = 'ReconcileAuditLogsActorNull202608280003';
+  name = 'ReconcileAuditLogsActorNull1787875200003';
 
   async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`DROP TRIGGER "audit_logs_append_only" ON "audit_logs"`);

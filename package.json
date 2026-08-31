@@ -8,9 +8,11 @@
   "scripts": {
     "dev": "turbo run dev --parallel",
     "build": "turbo run build",
-    "lint": "turbo run lint",
+    "lint": "eslint 'apps/**/*.{ts,tsx}' 'packages/**/*.{ts,tsx}'",
     "typecheck": "turbo run typecheck",
-    "test": "turbo run test",
+    "test": "node --test tooling/*.test.mjs && turbo run test",
+    "db:migrate": "pnpm --filter @effect/api migrate",
+    "db:seed": "pnpm --filter @effect/api seed",
     "test:integration": "turbo run test:integration",
     "test:e2e": "turbo run test:e2e"
   },

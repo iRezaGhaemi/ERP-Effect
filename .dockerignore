@@ -6,6 +6,10 @@ node_modules
 **/.next
 coverage
 dist
+**/dist
+**/dist-test
+.superpowers
+.testenv
 playwright-report
 test-results
 .env
