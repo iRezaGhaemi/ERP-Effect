@@ -1,6 +1,6 @@
 {
   "extends": "../../shared/typescript-config/nest.json",
-  "compilerOptions": { "rootDir": "src", "outDir": "dist" },
-  "include": ["src/**/*.ts"],
-  "exclude": ["src/**/*.test.ts"]
+  "compilerOptions": { "jsx": "react-jsx", "rootDir": "src", "outDir": "dist" },
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]
 }

@@ -15,6 +15,10 @@
     "./server": {
       "types": "./dist/server/index.d.ts",
       "default": "./dist/server/index.js"
+    },
+    "./web": {
+      "types": "./dist/web/index.d.ts",
+      "default": "./dist/web/index.js"
     }
   },
   "scripts": {
@@ -27,10 +31,17 @@
     "@effect-erp/contracts": "workspace:*",
     "@nestjs/common": "^11.1.17",
     "typeorm": "^0.3.28",
-    "zod": "^4.4.3"
+    "zod": "^4.4.3",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "@effect/ui": "workspace:*"
   },
   "devDependencies": {
     "@effect-erp/testing": "workspace:*",
-    "@types/node": "^24.0.0"
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@testing-library/react": "^16.3.2",
+    "jsdom": "^24.1.3"
   }
 }
