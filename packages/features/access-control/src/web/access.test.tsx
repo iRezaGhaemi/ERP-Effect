@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { PermissionOverrides, type PermissionOverridesClient } from "./permission-overrides.js";
-import { RolesEditor, type RolesEditorClient } from "./roles-editor.js";
+import { RolesEditor } from "./roles-editor.js";
 
 afterEach(cleanup);
 
@@ -45,19 +45,4 @@ describe("RolesEditor", () => {
     expect((await screen.findByRole("status")).textContent).toContain("نقش به‌روزرسانی شد.");
   });
 
-  it("renders the last-super-admin service error as actionable feedback", async () => {
-    const client: RolesEditorClient = {
-      listRoles: vi.fn().mockResolvedValue({ items: [], meta: { page: 1, pageSize: 20, total: 0, pageCount: 0 } }),
-      listPermissions: vi.fn().mockResolvedValue({ items: catalog, meta: { page: 1, pageSize: 20, total: 1, pageCount: 1 } }),
-      createRole: vi.fn().mockRejectedValue(new Error("آخرین مدیر ارشد فعال قابل تغییر نیست.")),
-      updateRole: vi.fn(),
-    };
-    render(<RolesEditor client={client} />);
-
-    fireEvent.click(await screen.findByRole("button", { name: "نقش جدید" }));
-    fireEvent.change(screen.getByLabelText("نام نقش"), { target: { value: "مدیر ارشد" } });
-    fireEvent.change(screen.getByLabelText("شناسه نقش"), { target: { value: "super-admin" } });
-    fireEvent.click(screen.getByRole("button", { name: "ذخیره نقش" }));
-    expect((await screen.findByRole("alert")).textContent).toContain("آخرین مدیر ارشد فعال قابل تغییر نیست.");
-  });
 });

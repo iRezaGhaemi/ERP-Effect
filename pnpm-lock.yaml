@@ -136,6 +136,9 @@ importers:
         specifier: ^19.2.8
         version: 19.2.8(react@19.2.8)
     devDependencies:
+      '@testing-library/react':
+        specifier: ^16.3.2
+        version: 16.3.3(@testing-library/dom@10.4.1)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@types/node':
         specifier: ^24.0.0
         version: 24.13.3
@@ -145,6 +148,9 @@ importers:
       '@types/react-dom':
         specifier: ^19.2.3
         version: 19.2.5(@types/react@19.2.18)
+      jsdom:
+        specifier: ^24.1.3
+        version: 24.1.3
 
   packages/features/access-control:
     dependencies:
@@ -313,6 +319,9 @@ importers:
       '@effect/audit':
         specifier: workspace:*
         version: link:../audit
+      '@effect/ui':
+        specifier: workspace:*
+        version: link:../../shared/ui
       '@nestjs/common':
         specifier: ^11.1.17
         version: 11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2)

@@ -9,7 +9,15 @@ import { AuditClient } from "./audit-client.js";
 
 export type AuditTableClient = Pick<AuditClient, "list">;
 
-function stableMetadata(metadata: Record<string, unknown>): string { try { return JSON.stringify(metadata, Object.keys(metadata).sort(), 2); } catch { return "{ }"; } }
+function sortMetadata(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(sortMetadata);
+  if (value !== null && typeof value === "object" && Object.prototype.toString.call(value) === "[object Object]") {
+    return Object.fromEntries(Object.keys(value).sort().map((key) => [key, sortMetadata((value as Record<string, unknown>)[key])]));
+  }
+  return value;
+}
+
+function stableMetadata(metadata: Record<string, unknown>): string { try { return JSON.stringify(sortMetadata(metadata), null, 2); } catch { return "{ }"; } }
 
 export function AuditTable({ principal, client = new AuditClient() }: { principal: { permissions: string[] }; client?: AuditTableClient }) {
   const allowed = principal.permissions.includes("audit:read"); const [page, setPage] = useState<Page<AuditLogDto>>(); const [loading, setLoading] = useState(allowed); const [error, setError] = useState("");

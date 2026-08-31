@@ -19,5 +19,6 @@ describe("AuditTable", () => {
 
     expect(await screen.findByText("user.updated")).toBeTruthy();
     expect(screen.getByText(/futureField/)).toBeTruthy();
+    expect(screen.getByText(/"status": "kept"/)).toBeTruthy();
   });
 });
