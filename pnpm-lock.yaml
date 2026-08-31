@@ -82,6 +82,9 @@ importers:
       typeorm:
         specifier: ^0.3.28
         version: 0.3.31(pg@8.23.0)
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       "@effect-erp/testing":
         specifier: workspace:*
@@ -305,6 +308,9 @@ importers:
 
   packages/shared/contracts:
     dependencies:
+      "@nestjs/common":
+        specifier: ^11.1.17
+        version: 11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2)
       zod:
         specifier: ^4.4.3
         version: 4.4.3

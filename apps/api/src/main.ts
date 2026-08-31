@@ -1,13 +1,17 @@
 import "reflect-metadata";
 
 import { NestFactory } from "@nestjs/core";
-import type { LoggerService } from "@nestjs/common";
+import type { INestApplication, LoggerService } from "@nestjs/common";
 import { parseEnv } from "@effect-erp/config";
 import { createAppLogger } from "@effect-erp/logger";
 import { DataSource } from "typeorm";
 import { assertAuditDatabaseBoundary } from "@effect/audit/server";
 
 import { AppModule } from "./app.module.js";
+
+export function configureHttpApp(app: INestApplication): void {
+  app.setGlobalPrefix("api/v1");
+}
 
 async function bootstrap(): Promise<void> {
   const env = parseEnv(process.env);
@@ -21,7 +25,7 @@ async function bootstrap(): Promise<void> {
     fatal: logger.fatal.bind(logger),
   };
   const app = await NestFactory.create(AppModule, { logger: nestLogger });
-  app.setGlobalPrefix("api/v1");
+  configureHttpApp(app);
 
   const dataSource = app.get(DataSource);
   await dataSource.initialize();

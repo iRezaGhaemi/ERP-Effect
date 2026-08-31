@@ -7,6 +7,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./server": {
+      "types": "./dist/server/index.d.ts",
+      "default": "./dist/server/index.js"
     }
   },
   "scripts": {
@@ -15,6 +19,7 @@
     "test": "vitest run --config vitest.config.ts"
   },
   "dependencies": {
+    "@nestjs/common": "^11.1.17",
     "zod": "^4.4.3"
   },
   "devDependencies": {

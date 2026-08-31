@@ -26,6 +26,7 @@ import { HardenOtpDeliveryOutbox202608280008 } from "../../../packages/platform/
 
 const sources: DataSource[] = [];
 let app: INestApplication | undefined;
+const webOrigin = "http://localhost:3000";
 
 afterEach(async () => {
   if (app) await app.close();
@@ -92,6 +93,7 @@ describe("OTP request API", () => {
           request(app!.getHttpServer())
             .post("/api/v1/auth/otp/request")
             .set("x-request-id", `req_e2e_${index}`)
+            .set("Origin", webOrigin)
             .send({ phone })
             .expect(202),
         ),

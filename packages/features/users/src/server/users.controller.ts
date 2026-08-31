@@ -1,5 +1,6 @@
 import type { AuthenticatedPrincipal } from "@effect-erp/contracts";
-import { DomainError } from "@effect-erp/contracts";
+import { DomainError, UuidIdParamsSchema } from "@effect-erp/contracts";
+import { ZodValidationPipe } from "@effect-erp/contracts/server";
 import {
   Body,
   Controller,
@@ -18,6 +19,9 @@ import {
   CreateUserSchema,
   UpdateUserSchema,
   UserPageQuerySchema,
+  type CreateUserInput,
+  type UpdateUserInput,
+  type UserPageQuery,
 } from "../contracts/index.js";
 import { UserStatus } from "../entities/index.js";
 import { UsersService } from "./users.service.js";
@@ -74,44 +78,48 @@ export class UsersController {
   constructor(private readonly users: UsersService) {}
   @Get()
   @RequirePermission("users:read")
-  list(@Query() query: unknown, @Req() request: PrincipalRequest) {
-    return execute(request, () =>
-      this.users.list(UserPageQuerySchema.parse(query)),
-    );
+  list(
+    @Query(new ZodValidationPipe(UserPageQuerySchema)) query: UserPageQuery,
+    @Req() request: PrincipalRequest,
+  ) {
+    return execute(request, () => this.users.list(query));
   }
   @Post()
   @RequirePermission("users:create")
-  create(@Body() body: unknown, @Req() request: PrincipalRequest) {
-    return execute(request, () =>
-      this.users.create(CreateUserSchema.parse(body), request.user.userId),
-    );
+  create(
+    @Body(new ZodValidationPipe(CreateUserSchema)) body: CreateUserInput,
+    @Req() request: PrincipalRequest,
+  ) {
+    return execute(request, () => this.users.create(body, request.user.userId));
   }
   @Get(":id")
   @RequirePermission("users:read")
-  get(@Param("id") id: string, @Req() request: PrincipalRequest) {
-    return execute(request, () => this.users.get(z.uuid().parse(id)));
+  get(
+    @Param(new ZodValidationPipe(UuidIdParamsSchema)) params: { id: string },
+    @Req() request: PrincipalRequest,
+  ) {
+    return execute(request, () => this.users.get(params.id));
   }
   @Patch(":id")
   @RequirePermission("users:update")
   update(
-    @Param("id") id: string,
-    @Body() body: unknown,
+    @Param(new ZodValidationPipe(UuidIdParamsSchema)) params: { id: string },
+    @Body(new ZodValidationPipe(UpdateUserSchema)) body: UpdateUserInput,
     @Req() request: PrincipalRequest,
   ) {
     return execute(request, () =>
-      this.users.update(
-        z.uuid().parse(id),
-        UpdateUserSchema.parse(body),
-        request.user.userId,
-      ),
+      this.users.update(params.id, body, request.user.userId),
     );
   }
   @Post(":id/suspend")
   @RequirePermission("users:suspend")
-  suspend(@Param("id") id: string, @Req() request: PrincipalRequest) {
+  suspend(
+    @Param(new ZodValidationPipe(UuidIdParamsSchema)) params: { id: string },
+    @Req() request: PrincipalRequest,
+  ) {
     return execute(request, () =>
       this.users.setStatus(
-        z.uuid().parse(id),
+        params.id,
         UserStatus.SUSPENDED,
         request.user.userId,
       ),
@@ -119,13 +127,12 @@ export class UsersController {
   }
   @Post(":id/activate")
   @RequirePermission("users:suspend")
-  activate(@Param("id") id: string, @Req() request: PrincipalRequest) {
+  activate(
+    @Param(new ZodValidationPipe(UuidIdParamsSchema)) params: { id: string },
+    @Req() request: PrincipalRequest,
+  ) {
     return execute(request, () =>
-      this.users.setStatus(
-        z.uuid().parse(id),
-        UserStatus.ACTIVE,
-        request.user.userId,
-      ),
+      this.users.setStatus(params.id, UserStatus.ACTIVE, request.user.userId),
     );
   }
 }

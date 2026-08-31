@@ -1,5 +1,6 @@
 import type { AuthenticatedPrincipal } from "@effect-erp/contracts";
-import { DomainError } from "@effect-erp/contracts";
+import { DomainError, UuidIdParamsSchema } from "@effect-erp/contracts";
+import { ZodValidationPipe } from "@effect-erp/contracts/server";
 import {
   Body,
   Controller,
@@ -20,6 +21,10 @@ import {
   ReplacePermissionOverridesSchema,
   ReplaceUserRolesSchema,
   UpdateRoleSchema,
+  type AccessPageQuery,
+  type CreateRoleInput,
+  type ReplacePermissionOverridesInput,
+  type UpdateRoleInput,
 } from "../contracts/index.js";
 import { AccessControlService } from "./access-control.service.js";
 import { RequirePermission } from "./require-permission.decorator.js";
@@ -79,59 +84,59 @@ export class AccessControlController {
 
   @Get("roles")
   @RequirePermission("roles:manage")
-  listRoles(@Query() query: unknown, @Req() request: RequestWithPrincipal) {
-    return execute(request, () =>
-      this.access.listRoles(AccessPageQuerySchema.parse(query)),
-    );
+  listRoles(
+    @Query(new ZodValidationPipe(AccessPageQuerySchema)) query: AccessPageQuery,
+    @Req() request: RequestWithPrincipal,
+  ) {
+    return execute(request, () => this.access.listRoles(query));
   }
 
   @Post("roles")
   @RequirePermission("roles:manage")
-  createRole(@Body() body: unknown, @Req() request: RequestWithPrincipal) {
+  createRole(
+    @Body(new ZodValidationPipe(CreateRoleSchema)) body: CreateRoleInput,
+    @Req() request: RequestWithPrincipal,
+  ) {
     return execute(request, () =>
-      this.access.createRole(CreateRoleSchema.parse(body), request.user.userId),
+      this.access.createRole(body, request.user.userId),
     );
   }
 
   @Patch("roles/:id")
   @RequirePermission("roles:manage")
   updateRole(
-    @Param("id") id: string,
-    @Body() body: unknown,
+    @Param(new ZodValidationPipe(UuidIdParamsSchema)) params: { id: string },
+    @Body(new ZodValidationPipe(UpdateRoleSchema)) body: UpdateRoleInput,
     @Req() request: RequestWithPrincipal,
   ) {
     return execute(request, () =>
-      this.access.updateRole(
-        z.uuid().parse(id),
-        UpdateRoleSchema.parse(body),
-        request.user.userId,
-      ),
+      this.access.updateRole(params.id, body, request.user.userId),
     );
   }
 
   @Get("permissions")
   @RequirePermission("roles:manage")
   listPermissions(
-    @Query() query: unknown,
+    @Query(new ZodValidationPipe(AccessPageQuerySchema)) query: AccessPageQuery,
     @Req() request: RequestWithPrincipal,
   ) {
-    return execute(request, () =>
-      this.access.listPermissions(AccessPageQuerySchema.parse(query)),
-    );
+    return execute(request, () => this.access.listPermissions(query));
   }
 
   @Put("users/:id/roles")
   @RequirePermission("roles:manage")
   replaceRoles(
-    @Param("id") id: string,
-    @Body() body: unknown,
+    @Param(new ZodValidationPipe(UuidIdParamsSchema)) params: { id: string },
+    @Body(new ZodValidationPipe(ReplaceUserRolesSchema))
+    body: {
+      roleIds: string[];
+    },
     @Req() request: RequestWithPrincipal,
   ) {
     return execute(request, async () => {
-      const values = ReplaceUserRolesSchema.parse(body);
       await this.access.replaceUserRoles(
-        z.uuid().parse(id),
-        values.roleIds,
+        params.id,
+        body.roleIds,
         request.user.userId,
       );
     });
@@ -140,15 +145,15 @@ export class AccessControlController {
   @Put("users/:id/permission-overrides")
   @RequirePermission("roles:manage")
   replaceOverrides(
-    @Param("id") id: string,
-    @Body() body: unknown,
+    @Param(new ZodValidationPipe(UuidIdParamsSchema)) params: { id: string },
+    @Body(new ZodValidationPipe(ReplacePermissionOverridesSchema))
+    body: ReplacePermissionOverridesInput,
     @Req() request: RequestWithPrincipal,
   ) {
     return execute(request, async () => {
-      const values = ReplacePermissionOverridesSchema.parse(body);
       await this.access.replaceUserPermissionOverrides(
-        z.uuid().parse(id),
-        values,
+        params.id,
+        body,
         request.user.userId,
       );
     });

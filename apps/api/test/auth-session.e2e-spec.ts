@@ -32,6 +32,7 @@ import { CreateSessions202608280009 } from "../../../packages/platform/database/
 
 const sources: DataSource[] = [];
 let app: INestApplication | undefined;
+const webOrigin = "http://localhost:3000";
 
 afterEach(async () => {
   if (app) await app.close();
@@ -46,6 +47,14 @@ function cookieHeader(setCookies: string[] | string | undefined): string {
       ? [setCookies]
       : [];
   return cookies.map((cookie) => cookie.split(";")[0]).join("; ");
+}
+
+function cookieValue(cookieHeader: string, name: string): string {
+  for (const part of cookieHeader.split(";")) {
+    const [key, ...valueParts] = part.trim().split("=");
+    if (key === name) return valueParts.join("=");
+  }
+  return "";
 }
 
 describe("auth session API", () => {
@@ -107,6 +116,7 @@ describe("auth session API", () => {
       const requested = await request(app.getHttpServer())
         .post("/api/v1/auth/otp/request")
         .set("x-request-id", "req_e2e_session_request")
+        .set("Origin", webOrigin)
         .send({ phone: "09121234567" })
         .expect(202);
       await module.get(OtpDeliveryWorker).runOnce();
@@ -116,6 +126,7 @@ describe("auth session API", () => {
       const verified = await request(app.getHttpServer())
         .post("/api/v1/auth/otp/verify")
         .set("x-request-id", "req_e2e_session_verify")
+        .set("Origin", webOrigin)
         .send({ challengeId: requested.body.challengeId, code })
         .expect(200);
 
@@ -134,6 +145,8 @@ describe("auth session API", () => {
       );
       expect(cookies.join("\n")).toContain("HttpOnly");
       const authCookies = cookieHeader(cookies);
+      const csrfToken = cookieValue(authCookies, "effect_csrf");
+      expect(csrfToken).not.toBe("");
 
       const me = await request(app.getHttpServer())
         .get("/api/v1/me")
@@ -160,6 +173,8 @@ describe("auth session API", () => {
       const logout = await request(app.getHttpServer())
         .post("/api/v1/auth/logout")
         .set("Cookie", authCookies)
+        .set("Origin", webOrigin)
+        .set("x-csrf-token", csrfToken)
         .expect(200);
       expect(cookieHeader(logout.headers["set-cookie"])).toContain(
         "effect_access=",

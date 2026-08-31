@@ -7,6 +7,7 @@
     "build": "pnpm --filter @effect-erp/config build && pnpm --filter @effect-erp/contracts build && pnpm --filter @effect/audit build && pnpm --filter @effect/users build && pnpm --filter @effect/access-control build && pnpm --filter @effect/auth build && pnpm --filter @effect-erp/database build && pnpm --filter @effect-erp/logger build && tsc -p tsconfig.json",
     "dev": "tsx watch src/main.ts",
     "migrate": "node dist/migrate.js",
+    "openapi:generate": "tsx src/openapi.ts",
     "seed": "node dist/seed.js",
     "start": "node dist/main.js",
     "test": "pnpm run build && vitest run --config vitest.config.ts",
@@ -27,7 +28,8 @@
     "@nestjs/platform-express": "^11.1.17",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
-    "typeorm": "^0.3.28"
+    "typeorm": "^0.3.28",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@effect-erp/testing": "workspace:*",

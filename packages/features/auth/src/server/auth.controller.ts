@@ -1,4 +1,5 @@
-import { DomainError } from "@effect-erp/contracts";
+import { DomainError, UuidIdParamsSchema } from "@effect-erp/contracts";
+import { ZodValidationPipe } from "@effect-erp/contracts/server";
 import { RequirePermission } from "@effect/access-control/server";
 import {
   Body,
@@ -23,6 +24,9 @@ import {
   AuthSessionPageSchema,
   RequestOtpSchema,
   VerifyOtpSchema,
+  type AuthSessionListQuery,
+  type RequestOtpInput,
+  type VerifyOtpInput,
 } from "../contracts/index.js";
 import { AUTH_OPTIONS, type AuthOptions } from "./auth.options.js";
 import { parseCookieHeader } from "./cookie-parser.js";
@@ -188,12 +192,12 @@ export class AuthController {
   @Public()
   @Post("auth/otp/request")
   @HttpCode(HttpStatus.ACCEPTED)
-  async requestOtp(@Body() body: unknown, @Req() request: RequestWithContext) {
+  async requestOtp(
+    @Body(new ZodValidationPipe(RequestOtpSchema)) body: RequestOtpInput,
+    @Req() request: RequestWithContext,
+  ) {
     return execute(request, () =>
-      this.otpService.request(
-        RequestOtpSchema.parse(body),
-        requestContext(request),
-      ),
+      this.otpService.request(body, requestContext(request)),
     );
   }
 
@@ -201,7 +205,7 @@ export class AuthController {
   @Post("auth/otp/verify")
   @HttpCode(HttpStatus.OK)
   async verifyOtp(
-    @Body() body: unknown,
+    @Body(new ZodValidationPipe(VerifyOtpSchema)) body: VerifyOtpInput,
     @Req() request: RequestWithContext,
     @Res({ passthrough: true }) response: CookieResponse,
   ) {
@@ -209,7 +213,7 @@ export class AuthController {
       if (!this.options)
         throw new DomainError("SESSION_INVALID", "نشست نامعتبر است.");
       const result = await this.otpService.verify(
-        VerifyOtpSchema.parse(body),
+        body,
         requestContext(request),
       );
       setAuthCookies(response, result, this.options);
@@ -274,7 +278,11 @@ export class AuthController {
   }
 
   @Get("auth/sessions")
-  listSessions(@Query() query: unknown, @Req() request: RequestWithContext) {
+  listSessions(
+    @Query(new ZodValidationPipe(AuthSessionListQuerySchema))
+    query: AuthSessionListQuery,
+    @Req() request: RequestWithContext,
+  ) {
     return execute(request, async () => {
       if (!this.sessions || !request.user)
         throw new DomainError("SESSION_INVALID", "نشست نامعتبر است.");
@@ -290,14 +298,14 @@ export class AuthController {
   @Delete("auth/sessions/:id")
   @RequirePermission("sessions:revoke")
   async revokeSession(
-    @Param("id") id: string,
+    @Param(new ZodValidationPipe(UuidIdParamsSchema)) params: { id: string },
     @Req() request: RequestWithContext,
   ) {
     return execute(request, async () => {
       if (!this.sessions || !request.user)
         throw new DomainError("SESSION_INVALID", "نشست نامعتبر است.");
       await this.sessions.revokeSession(
-        z.uuid().parse(id),
+        params.id,
         request.user.userId,
         requestContext(request),
       );

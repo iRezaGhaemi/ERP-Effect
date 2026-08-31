@@ -2,6 +2,8 @@ export { DomainError } from './domain-error.js';
 export type { FieldErrors } from './domain-error.js';
 export { ApiError, ErrorEnvelopeSchema } from './error.js';
 export type { ErrorDetails, ErrorEnvelope } from './error.js';
+export { OkResponseSchema, UuidIdParamsSchema } from './http.js';
+export type { OkResponse, UuidIdParams } from './http.js';
 export { HealthResponseSchema } from './health.js';
 export type { HealthResponse } from './health.js';
 export { createPageSchema, PageMetaSchema } from './pagination.js';

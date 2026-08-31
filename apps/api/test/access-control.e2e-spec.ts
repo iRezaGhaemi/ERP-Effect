@@ -61,6 +61,9 @@ class TestingAuthenticationGuard implements CanActivate {
 
 const sources: DataSource[] = [];
 let app: INestApplication | undefined;
+const webOrigin = "http://localhost:3000";
+const csrfToken = "access-control-e2e-csrf";
+const csrfCookie = `effect_csrf=${csrfToken}`;
 afterEach(async () => {
   if (app) await app.close();
   app = undefined;
@@ -145,6 +148,9 @@ describe("access-control API", () => {
       const protectedUpdate = await request(app.getHttpServer())
         .patch(`/api/v1/roles/${superAdmin.id}`)
         .set("x-test-user-id", adminId)
+        .set("Cookie", csrfCookie)
+        .set("Origin", webOrigin)
+        .set("x-csrf-token", csrfToken)
         .send({ permissionIds: [] })
         .expect(422);
       expect(protectedUpdate.body.error.code).toBe("SYSTEM_ROLE_PROTECTED");
@@ -160,6 +166,9 @@ describe("access-control API", () => {
       const createdRole = await request(app.getHttpServer())
         .post("/api/v1/roles")
         .set("x-test-user-id", adminId)
+        .set("Cookie", csrfCookie)
+        .set("Origin", webOrigin)
+        .set("x-csrf-token", csrfToken)
         .send({
           name: "اپراتور",
           slug: "operator",
@@ -172,6 +181,9 @@ describe("access-control API", () => {
       const updatedRole = await request(app.getHttpServer())
         .patch(`/api/v1/roles/${createdRole.body.id}`)
         .set("x-test-user-id", adminId)
+        .set("Cookie", csrfCookie)
+        .set("Origin", webOrigin)
+        .set("x-csrf-token", csrfToken)
         .send({ name: "اپراتور ارشد" })
         .expect(200);
       expect(RoleDtoSchema.parse(updatedRole.body).name).toBe("اپراتور ارشد");
@@ -184,6 +196,9 @@ describe("access-control API", () => {
       const created = await request(app.getHttpServer())
         .post("/api/v1/users")
         .set("x-test-user-id", adminId)
+        .set("Cookie", csrfCookie)
+        .set("Origin", webOrigin)
+        .set("x-csrf-token", csrfToken)
         .send({ phone: "09123334444", firstName: "کاربر", lastName: "محدود" })
         .expect(201);
       expect(() => UserDtoSchema.parse(created.body)).not.toThrow();
@@ -206,6 +221,9 @@ describe("access-control API", () => {
       await request(app.getHttpServer())
         .put(`/api/v1/users/${adminId}/permission-overrides`)
         .set("x-test-user-id", adminId)
+        .set("Cookie", csrfCookie)
+        .set("Origin", webOrigin)
+        .set("x-csrf-token", csrfToken)
         .send({ overrides: [{ permissionId, effect: "DENY" }] })
         .expect(200);
       await request(app.getHttpServer())
