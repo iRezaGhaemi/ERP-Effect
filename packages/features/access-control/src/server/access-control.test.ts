@@ -189,7 +189,7 @@ describe("system role protection", () => {
 
     await expect(
       controller.updateRole(
-        role.id,
+        { id: role.id },
         { permissionIds: [] },
         {
           user: {
@@ -210,5 +210,47 @@ describe("system role protection", () => {
         },
       },
     });
+  });
+});
+
+describe("administration replacement responses", () => {
+  const request = {
+    user: {
+      userId: actorId,
+      sessionId: randomUUID(),
+      phone: "+989000000000",
+      permissions: ["roles:manage"],
+    },
+    headers: { "x-request-id": "req_replacement_response" },
+  };
+
+  it("returns OkResponse after replacing a user's roles", async () => {
+    const service = {
+      replaceUserRoles: vi.fn().mockResolvedValue(undefined),
+    };
+    const controller = new AccessControlController(service as never);
+
+    await expect(
+      controller.replaceRoles(
+        { id: userId },
+        { roleIds: [randomUUID()] },
+        request,
+      ),
+    ).resolves.toEqual({ ok: true });
+  });
+
+  it("returns OkResponse after replacing permission overrides", async () => {
+    const service = {
+      replaceUserPermissionOverrides: vi.fn().mockResolvedValue(undefined),
+    };
+    const controller = new AccessControlController(service as never);
+
+    await expect(
+      controller.replaceOverrides(
+        { id: userId },
+        { overrides: [{ permissionId: randomUUID(), effect: "ALLOW" }] },
+        request,
+      ),
+    ).resolves.toEqual({ ok: true });
   });
 });

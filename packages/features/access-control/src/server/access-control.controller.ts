@@ -139,6 +139,7 @@ export class AccessControlController {
         body.roleIds,
         request.user.userId,
       );
+      return { ok: true };
     });
   }
 
@@ -156,6 +157,7 @@ export class AccessControlController {
         body,
         request.user.userId,
       );
+      return { ok: true };
     });
   }
 }

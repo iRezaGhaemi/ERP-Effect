@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 
 import type { AuthenticatedPrincipal } from "@effect-erp/contracts";
+import { CsrfTokenSchema } from "@effect/auth/contracts";
 import { DomainError } from "@effect-erp/contracts";
 import { CanActivate, type ExecutionContext, Injectable } from "@nestjs/common";
 
@@ -48,9 +49,14 @@ function requestPath(request: CsrfRequest): string {
 }
 
 function tokensMatch(leftToken: string, rightToken: string): boolean {
+  if (
+    !CsrfTokenSchema.safeParse(leftToken).success ||
+    !CsrfTokenSchema.safeParse(rightToken).success
+  ) {
+    return false;
+  }
   const left = Buffer.from(leftToken);
   const right = Buffer.from(rightToken);
-  if (left.length === 0 || left.length !== right.length) return false;
   return timingSafeEqual(left, right);
 }
 

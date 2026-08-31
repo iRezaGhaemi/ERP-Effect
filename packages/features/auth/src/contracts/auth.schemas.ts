@@ -22,6 +22,14 @@ export const RequestOtpSchema = z.object({
   phone: z.string().trim().refine(isIranianMobile, "شماره موبایل معتبر نیست."),
 });
 
+export const CSRF_TOKEN_BYTES = 32;
+export const CSRF_TOKEN_LENGTH = Math.ceil((CSRF_TOKEN_BYTES * 8) / 6);
+const csrfTokenPattern = new RegExp(`^[A-Za-z0-9_-]{${CSRF_TOKEN_LENGTH}}$`);
+export const CsrfTokenSchema = z
+  .string()
+  .length(CSRF_TOKEN_LENGTH)
+  .regex(csrfTokenPattern);
+
 export const RequestOtpResponseSchema = z.object({
   accepted: z.literal(true),
   challengeId: z.uuid(),

@@ -31,6 +31,7 @@
         "tags": [
           "health"
         ],
+        "security": [],
         "responses": {
           "200": {
             "description": "Healthy",
@@ -61,6 +62,7 @@
         "tags": [
           "health"
         ],
+        "security": [],
         "responses": {
           "200": {
             "description": "Healthy",
@@ -90,6 +92,19 @@
         "operationId": "AuthController_requestOtp",
         "tags": [
           "auth"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "description": "Must equal the configured WEB_ORIGIN.",
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
         ],
         "requestBody": {
           "required": true,
@@ -181,6 +196,26 @@
                 }
               }
             }
+          },
+          "502": {
+            "description": "Upstream delivery failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporarily unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         }
       }
@@ -190,6 +225,19 @@
         "operationId": "AuthController_verifyOtp",
         "tags": [
           "auth"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "description": "Must equal the configured WEB_ORIGIN.",
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
         ],
         "requestBody": {
           "required": true,
@@ -281,6 +329,26 @@
                 }
               }
             }
+          },
+          "502": {
+            "description": "Upstream delivery failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporarily unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         }
       }
@@ -290,6 +358,23 @@
         "operationId": "AuthController_refresh",
         "tags": [
           "auth"
+        ],
+        "security": [
+          {
+            "RefreshCookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "description": "Must equal the configured WEB_ORIGIN.",
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
         ],
         "responses": {
           "200": {
@@ -371,6 +456,26 @@
                 }
               }
             }
+          },
+          "502": {
+            "description": "Upstream delivery failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporarily unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         }
       }
@@ -380,6 +485,35 @@
         "operationId": "AuthController_logout",
         "tags": [
           "auth"
+        ],
+        "security": [
+          {
+            "AccessCookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "description": "Must equal the configured WEB_ORIGIN.",
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-csrf-token",
+            "required": true,
+            "description": "Must match the effect_csrf cookie for authenticated mutations.",
+            "schema": {
+              "type": "string",
+              "minLength": 43,
+              "maxLength": 43,
+              "pattern": "^[A-Za-z0-9_-]{43}$"
+            }
+          }
         ],
         "responses": {
           "200": {
@@ -454,6 +588,26 @@
           },
           "500": {
             "description": "Unexpected error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Upstream delivery failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporarily unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -471,6 +625,35 @@
         "tags": [
           "auth"
         ],
+        "security": [
+          {
+            "AccessCookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "description": "Must equal the configured WEB_ORIGIN.",
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-csrf-token",
+            "required": true,
+            "description": "Must match the effect_csrf cookie for authenticated mutations.",
+            "schema": {
+              "type": "string",
+              "minLength": 43,
+              "maxLength": 43,
+              "pattern": "^[A-Za-z0-9_-]{43}$"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Success",
@@ -551,6 +734,26 @@
                 }
               }
             }
+          },
+          "502": {
+            "description": "Upstream delivery failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporarily unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         }
       }
@@ -561,11 +764,16 @@
         "tags": [
           "sessions"
         ],
+        "security": [
+          {
+            "AccessCookieAuth": []
+          }
+        ],
         "parameters": [
           {
             "in": "query",
             "name": "page",
-            "required": true,
+            "required": false,
             "schema": {
               "default": 1,
               "type": "integer",
@@ -576,7 +784,7 @@
           {
             "in": "query",
             "name": "pageSize",
-            "required": true,
+            "required": false,
             "schema": {
               "default": 20,
               "type": "integer",
@@ -665,6 +873,26 @@
                 }
               }
             }
+          },
+          "502": {
+            "description": "Upstream delivery failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporarily unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         }
       }
@@ -675,6 +903,11 @@
         "tags": [
           "sessions"
         ],
+        "security": [
+          {
+            "AccessCookieAuth": []
+          }
+        ],
         "parameters": [
           {
             "in": "path",
@@ -684,6 +917,28 @@
               "type": "string",
               "format": "uuid",
               "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "description": "Must equal the configured WEB_ORIGIN.",
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-csrf-token",
+            "required": true,
+            "description": "Must match the effect_csrf cookie for authenticated mutations.",
+            "schema": {
+              "type": "string",
+              "minLength": 43,
+              "maxLength": 43,
+              "pattern": "^[A-Za-z0-9_-]{43}$"
             }
           }
         ],
@@ -767,6 +1022,26 @@
                 }
               }
             }
+          },
+          "502": {
+            "description": "Upstream delivery failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporarily unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         }
       }
@@ -776,6 +1051,11 @@
         "operationId": "AuthController_me",
         "tags": [
           "auth"
+        ],
+        "security": [
+          {
+            "AccessCookieAuth": []
+          }
         ],
         "responses": {
           "200": {
@@ -857,6 +1137,26 @@
                 }
               }
             }
+          },
+          "502": {
+            "description": "Upstream delivery failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporarily unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         }
       }
@@ -867,11 +1167,16 @@
         "tags": [
           "users"
         ],
+        "security": [
+          {
+            "AccessCookieAuth": []
+          }
+        ],
         "parameters": [
           {
             "in": "query",
             "name": "page",
-            "required": true,
+            "required": false,
             "schema": {
               "default": 1,
               "type": "integer",
@@ -882,7 +1187,7 @@
           {
             "in": "query",
             "name": "pageSize",
-            "required": true,
+            "required": false,
             "schema": {
               "default": 20,
               "type": "integer",
@@ -971,6 +1276,26 @@
                 }
               }
             }
+          },
+          "502": {
+            "description": "Upstream delivery failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporarily unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         }
       },
@@ -978,6 +1303,35 @@
         "operationId": "UsersController_create",
         "tags": [
           "users"
+        ],
+        "security": [
+          {
+            "AccessCookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "description": "Must equal the configured WEB_ORIGIN.",
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-csrf-token",
+            "required": true,
+            "description": "Must match the effect_csrf cookie for authenticated mutations.",
+            "schema": {
+              "type": "string",
+              "minLength": 43,
+              "maxLength": 43,
+              "pattern": "^[A-Za-z0-9_-]{43}$"
+            }
+          }
         ],
         "requestBody": {
           "required": true,
@@ -1069,6 +1423,26 @@
                 }
               }
             }
+          },
+          "502": {
+            "description": "Upstream delivery failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporarily unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         }
       }
@@ -1078,6 +1452,11 @@
         "operationId": "UsersController_get",
         "tags": [
           "users"
+        ],
+        "security": [
+          {
+            "AccessCookieAuth": []
+          }
         ],
         "parameters": [
           {
@@ -1171,6 +1550,26 @@
                 }
               }
             }
+          },
+          "502": {
+            "description": "Upstream delivery failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporarily unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         }
       },
@@ -1178,6 +1577,11 @@
         "operationId": "UsersController_update",
         "tags": [
           "users"
+        ],
+        "security": [
+          {
+            "AccessCookieAuth": []
+          }
         ],
         "parameters": [
           {
@@ -1188,6 +1592,28 @@
               "type": "string",
               "format": "uuid",
               "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "description": "Must equal the configured WEB_ORIGIN.",
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-csrf-token",
+            "required": true,
+            "description": "Must match the effect_csrf cookie for authenticated mutations.",
+            "schema": {
+              "type": "string",
+              "minLength": 43,
+              "maxLength": 43,
+              "pattern": "^[A-Za-z0-9_-]{43}$"
             }
           }
         ],
@@ -1281,6 +1707,26 @@
                 }
               }
             }
+          },
+          "502": {
+            "description": "Upstream delivery failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporarily unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         }
       }
@@ -1291,6 +1737,11 @@
         "tags": [
           "users"
         ],
+        "security": [
+          {
+            "AccessCookieAuth": []
+          }
+        ],
         "parameters": [
           {
             "in": "path",
@@ -1300,6 +1751,28 @@
               "type": "string",
               "format": "uuid",
               "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "description": "Must equal the configured WEB_ORIGIN.",
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-csrf-token",
+            "required": true,
+            "description": "Must match the effect_csrf cookie for authenticated mutations.",
+            "schema": {
+              "type": "string",
+              "minLength": 43,
+              "maxLength": 43,
+              "pattern": "^[A-Za-z0-9_-]{43}$"
             }
           }
         ],
@@ -1376,6 +1849,26 @@
           },
           "500": {
             "description": "Unexpected error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Upstream delivery failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporarily unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -1393,6 +1886,11 @@
         "tags": [
           "users"
         ],
+        "security": [
+          {
+            "AccessCookieAuth": []
+          }
+        ],
         "parameters": [
           {
             "in": "path",
@@ -1402,6 +1900,28 @@
               "type": "string",
               "format": "uuid",
               "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "description": "Must equal the configured WEB_ORIGIN.",
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-csrf-token",
+            "required": true,
+            "description": "Must match the effect_csrf cookie for authenticated mutations.",
+            "schema": {
+              "type": "string",
+              "minLength": 43,
+              "maxLength": 43,
+              "pattern": "^[A-Za-z0-9_-]{43}$"
             }
           }
         ],
@@ -1485,6 +2005,26 @@
                 }
               }
             }
+          },
+          "502": {
+            "description": "Upstream delivery failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporarily unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         }
       }
@@ -1495,11 +2035,16 @@
         "tags": [
           "roles"
         ],
+        "security": [
+          {
+            "AccessCookieAuth": []
+          }
+        ],
         "parameters": [
           {
             "in": "query",
             "name": "page",
-            "required": true,
+            "required": false,
             "schema": {
               "default": 1,
               "type": "integer",
@@ -1510,7 +2055,7 @@
           {
             "in": "query",
             "name": "pageSize",
-            "required": true,
+            "required": false,
             "schema": {
               "default": 20,
               "type": "integer",
@@ -1599,6 +2144,26 @@
                 }
               }
             }
+          },
+          "502": {
+            "description": "Upstream delivery failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporarily unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         }
       },
@@ -1606,6 +2171,35 @@
         "operationId": "AccessControlController_createRole",
         "tags": [
           "roles"
+        ],
+        "security": [
+          {
+            "AccessCookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "description": "Must equal the configured WEB_ORIGIN.",
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-csrf-token",
+            "required": true,
+            "description": "Must match the effect_csrf cookie for authenticated mutations.",
+            "schema": {
+              "type": "string",
+              "minLength": 43,
+              "maxLength": 43,
+              "pattern": "^[A-Za-z0-9_-]{43}$"
+            }
+          }
         ],
         "requestBody": {
           "required": true,
@@ -1697,6 +2291,26 @@
                 }
               }
             }
+          },
+          "502": {
+            "description": "Upstream delivery failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporarily unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         }
       }
@@ -1707,6 +2321,11 @@
         "tags": [
           "roles"
         ],
+        "security": [
+          {
+            "AccessCookieAuth": []
+          }
+        ],
         "parameters": [
           {
             "in": "path",
@@ -1716,6 +2335,28 @@
               "type": "string",
               "format": "uuid",
               "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "description": "Must equal the configured WEB_ORIGIN.",
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-csrf-token",
+            "required": true,
+            "description": "Must match the effect_csrf cookie for authenticated mutations.",
+            "schema": {
+              "type": "string",
+              "minLength": 43,
+              "maxLength": 43,
+              "pattern": "^[A-Za-z0-9_-]{43}$"
             }
           }
         ],
@@ -1809,6 +2450,26 @@
                 }
               }
             }
+          },
+          "502": {
+            "description": "Upstream delivery failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporarily unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         }
       }
@@ -1819,11 +2480,16 @@
         "tags": [
           "roles"
         ],
+        "security": [
+          {
+            "AccessCookieAuth": []
+          }
+        ],
         "parameters": [
           {
             "in": "query",
             "name": "page",
-            "required": true,
+            "required": false,
             "schema": {
               "default": 1,
               "type": "integer",
@@ -1834,7 +2500,7 @@
           {
             "in": "query",
             "name": "pageSize",
-            "required": true,
+            "required": false,
             "schema": {
               "default": 20,
               "type": "integer",
@@ -1923,6 +2589,26 @@
                 }
               }
             }
+          },
+          "502": {
+            "description": "Upstream delivery failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporarily unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         }
       }
@@ -1933,6 +2619,11 @@
         "tags": [
           "users"
         ],
+        "security": [
+          {
+            "AccessCookieAuth": []
+          }
+        ],
         "parameters": [
           {
             "in": "path",
@@ -1942,6 +2633,28 @@
               "type": "string",
               "format": "uuid",
               "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "description": "Must equal the configured WEB_ORIGIN.",
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-csrf-token",
+            "required": true,
+            "description": "Must match the effect_csrf cookie for authenticated mutations.",
+            "schema": {
+              "type": "string",
+              "minLength": 43,
+              "maxLength": 43,
+              "pattern": "^[A-Za-z0-9_-]{43}$"
             }
           }
         ],
@@ -2035,6 +2748,26 @@
                 }
               }
             }
+          },
+          "502": {
+            "description": "Upstream delivery failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporarily unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         }
       }
@@ -2045,6 +2778,11 @@
         "tags": [
           "users"
         ],
+        "security": [
+          {
+            "AccessCookieAuth": []
+          }
+        ],
         "parameters": [
           {
             "in": "path",
@@ -2054,6 +2792,28 @@
               "type": "string",
               "format": "uuid",
               "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "description": "Must equal the configured WEB_ORIGIN.",
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-csrf-token",
+            "required": true,
+            "description": "Must match the effect_csrf cookie for authenticated mutations.",
+            "schema": {
+              "type": "string",
+              "minLength": 43,
+              "maxLength": 43,
+              "pattern": "^[A-Za-z0-9_-]{43}$"
             }
           }
         ],
@@ -2147,6 +2907,26 @@
                 }
               }
             }
+          },
+          "502": {
+            "description": "Upstream delivery failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporarily unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         }
       }
@@ -2157,11 +2937,16 @@
         "tags": [
           "audit"
         ],
+        "security": [
+          {
+            "AccessCookieAuth": []
+          }
+        ],
         "parameters": [
           {
             "in": "query",
             "name": "page",
-            "required": true,
+            "required": false,
             "schema": {
               "default": 1,
               "type": "integer",
@@ -2172,7 +2957,7 @@
           {
             "in": "query",
             "name": "pageSize",
-            "required": true,
+            "required": false,
             "schema": {
               "default": 20,
               "type": "integer",
@@ -2261,12 +3046,46 @@
                 }
               }
             }
+          },
+          "502": {
+            "description": "Upstream delivery failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporarily unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         }
       }
     }
   },
   "components": {
+    "securitySchemes": {
+      "AccessCookieAuth": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "effect_access",
+        "description": "Authenticated session access cookie."
+      },
+      "RefreshCookieAuth": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "effect_refresh",
+        "description": "Refresh-session cookie accepted only by the refresh endpoint."
+      }
+    },
     "schemas": {
       "AccessPageQuery": {
         "type": "object",
@@ -2283,12 +3102,7 @@
             "exclusiveMinimum": 0,
             "maximum": 100
           }
-        },
-        "required": [
-          "page",
-          "pageSize"
-        ],
-        "additionalProperties": false
+        }
       },
       "AuditLogPage": {
         "type": "object",
@@ -2435,12 +3249,7 @@
             "exclusiveMinimum": 0,
             "maximum": 9007199254740991
           }
-        },
-        "required": [
-          "page",
-          "pageSize"
-        ],
-        "additionalProperties": false
+        }
       },
       "AuthSessionListQuery": {
         "type": "object",
@@ -2457,12 +3266,7 @@
             "exclusiveMinimum": 0,
             "maximum": 100
           }
-        },
-        "required": [
-          "page",
-          "pageSize"
-        ],
-        "additionalProperties": false
+        }
       },
       "AuthSessionPage": {
         "type": "object",
@@ -2647,10 +3451,8 @@
         },
         "required": [
           "name",
-          "slug",
-          "permissionIds"
-        ],
-        "additionalProperties": false
+          "slug"
+        ]
       },
       "CreateUser": {
         "type": "object",
@@ -2673,8 +3475,7 @@
           "phone",
           "firstName",
           "lastName"
-        ],
-        "additionalProperties": false
+        ]
       },
       "ErrorEnvelope": {
         "type": "object",
@@ -2973,15 +3774,13 @@
               "required": [
                 "permissionId",
                 "effect"
-              ],
-              "additionalProperties": false
+              ]
             }
           }
         },
         "required": [
           "overrides"
-        ],
-        "additionalProperties": false
+        ]
       },
       "ReplaceUserRoles": {
         "type": "object",
@@ -2997,8 +3796,7 @@
         },
         "required": [
           "roleIds"
-        ],
-        "additionalProperties": false
+        ]
       },
       "RequestOtp": {
         "type": "object",
@@ -3009,8 +3807,7 @@
         },
         "required": [
           "phone"
-        ],
-        "additionalProperties": false
+        ]
       },
       "RequestOtpResponse": {
         "type": "object",
@@ -3194,8 +3991,7 @@
               "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
             }
           }
-        },
-        "additionalProperties": false
+        }
       },
       "UpdateUser": {
         "type": "object",
@@ -3213,8 +4009,7 @@
             "minLength": 1,
             "maxLength": 80
           }
-        },
-        "additionalProperties": false
+        }
       },
       "UserDetailDto": {
         "type": "object",
@@ -3491,12 +4286,7 @@
             "exclusiveMinimum": 0,
             "maximum": 100
           }
-        },
-        "required": [
-          "page",
-          "pageSize"
-        ],
-        "additionalProperties": false
+        }
       },
       "UuidIdParams": {
         "type": "object",
@@ -3509,8 +4299,7 @@
         },
         "required": [
           "id"
-        ],
-        "additionalProperties": false
+        ]
       },
       "VerifyOtp": {
         "type": "object",
@@ -3528,8 +4317,7 @@
         "required": [
           "challengeId",
           "code"
-        ],
-        "additionalProperties": false
+        ]
       }
     }
   }

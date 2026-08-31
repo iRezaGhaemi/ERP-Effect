@@ -23,6 +23,34 @@ type RequestWithPrincipal = {
   user?: AuthenticatedPrincipal;
 };
 
+type OpenApiParameter = {
+  in?: string;
+  name?: string;
+  required?: boolean;
+  schema?: Record<string, unknown>;
+};
+
+type OpenApiOperation = {
+  parameters?: OpenApiParameter[];
+  responses?: Record<string, unknown>;
+  security?: Array<Record<string, string[]>>;
+  tags?: string[];
+};
+
+type OpenApiDocument = {
+  components: {
+    schemas?: Record<
+      string,
+      {
+        properties?: Record<string, { required?: string[] }>;
+        required?: string[];
+      }
+    >;
+    securitySchemes?: Record<string, unknown>;
+  };
+  paths: Record<string, Record<string, OpenApiOperation>>;
+};
+
 const webOrigin = "http://localhost:3000";
 const authCookies =
   "effect_access=identity-test-access; effect_csrf=identity-test-csrf";
@@ -101,6 +129,19 @@ async function createApp(): Promise<INestApplication> {
   return app;
 }
 
+async function openApiDocument(): Promise<OpenApiDocument> {
+  const openApiModule = "../src/openapi.js";
+  const { buildOpenApiDocument } = await import(openApiModule);
+  return buildOpenApiDocument() as OpenApiDocument;
+}
+
+function parameter(
+  operation: OpenApiOperation,
+  name: string,
+): OpenApiParameter | undefined {
+  return operation.parameters?.find((candidate) => candidate.name === name);
+}
+
 describe("identity API security boundary", () => {
   it("rejects an authenticated mutation without matching CSRF values", async () => {
     const server = (await createApp()).getHttpServer();
@@ -147,20 +188,7 @@ describe("identity API security boundary", () => {
   });
 
   it("documents only versioned API paths with success and ErrorEnvelope responses", async () => {
-    const openApiModule = "../src/openapi.js";
-    const { buildOpenApiDocument } = await import(openApiModule);
-    const document = buildOpenApiDocument() as {
-      paths: Record<
-        string,
-        Record<
-          string,
-          {
-            tags?: string[];
-            responses?: Record<string, unknown>;
-          }
-        >
-      >;
-    };
+    const document = await openApiDocument();
 
     for (const [path, pathItem] of Object.entries(document.paths)) {
       expect(path.startsWith("/api/v1")).toBe(true);
@@ -173,7 +201,88 @@ describe("identity API security boundary", () => {
         expect(JSON.stringify(responses)).toContain(
           "#/components/schemas/ErrorEnvelope",
         );
+        expect(responses).toHaveProperty("502");
+        expect(responses).toHaveProperty("503");
       }
     }
+  });
+
+  it("documents cookie authentication plus Origin and CSRF semantics", async () => {
+    const document = await openApiDocument();
+    const usersCreate = document.paths["/api/v1/users"]?.post;
+    const otpRequest = document.paths["/api/v1/auth/otp/request"]?.post;
+    const refresh = document.paths["/api/v1/auth/refresh"]?.post;
+    const live = document.paths["/api/v1/health/live"]?.get;
+
+    expect(document.components.securitySchemes).toMatchObject({
+      AccessCookieAuth: {
+        type: "apiKey",
+        in: "cookie",
+        name: "effect_access",
+      },
+      RefreshCookieAuth: {
+        type: "apiKey",
+        in: "cookie",
+        name: "effect_refresh",
+      },
+    });
+    expect(usersCreate?.security).toEqual([{ AccessCookieAuth: [] }]);
+    expect(otpRequest?.security).toEqual([]);
+    expect(refresh?.security).toEqual([{ RefreshCookieAuth: [] }]);
+    expect(live?.security).toEqual([]);
+    expect(parameter(usersCreate as OpenApiOperation, "Origin")).toMatchObject({
+      in: "header",
+      required: true,
+    });
+    expect(
+      parameter(usersCreate as OpenApiOperation, "x-csrf-token"),
+    ).toMatchObject({
+      in: "header",
+      required: true,
+      schema: {
+        pattern: "^[A-Za-z0-9_-]{43}$",
+      },
+    });
+    expect(parameter(otpRequest as OpenApiOperation, "Origin")).toMatchObject({
+      in: "header",
+      required: true,
+    });
+    expect(parameter(otpRequest as OpenApiOperation, "x-csrf-token")).toBe(
+      undefined,
+    );
+    expect(parameter(refresh as OpenApiOperation, "Origin")).toMatchObject({
+      in: "header",
+      required: true,
+    });
+    expect(parameter(refresh as OpenApiOperation, "x-csrf-token")).toBe(
+      undefined,
+    );
+  });
+
+  it("documents defaulted pagination fields as optional request inputs", async () => {
+    const document = await openApiDocument();
+    const usersList = document.paths["/api/v1/users"]?.get as OpenApiOperation;
+
+    expect(parameter(usersList, "page")).toMatchObject({
+      in: "query",
+      required: false,
+      schema: { default: 1 },
+    });
+    expect(parameter(usersList, "pageSize")).toMatchObject({
+      in: "query",
+      required: false,
+      schema: { default: 20 },
+    });
+  });
+
+  it("keeps response components in output mode while request defaults stay optional", async () => {
+    const document = await openApiDocument();
+    const errorFields =
+      document.components.schemas?.ErrorEnvelope?.properties?.error?.required;
+    const createRoleRequired =
+      document.components.schemas?.CreateRole?.required;
+
+    expect(errorFields).toContain("fields");
+    expect(createRoleRequired).not.toContain("permissionIds");
   });
 });

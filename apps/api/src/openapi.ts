@@ -20,6 +20,7 @@ import {
   MeResponseSchema,
   RequestOtpResponseSchema,
   RequestOtpSchema,
+  CsrfTokenSchema,
   VerifyOtpSchema,
 } from "@effect/auth/contracts";
 import { AuditLogPageSchema, AuditQuerySchema } from "@effect/audit/contracts";
@@ -40,6 +41,7 @@ import {
 import { z } from "zod";
 
 type JsonObject = Record<string, unknown>;
+type SecurityMode = "access" | "public" | "refresh";
 
 const componentSchemas: Record<string, z.ZodType> = {
   AccessPageQuery: AccessPageQuerySchema,
@@ -72,8 +74,27 @@ const componentSchemas: Record<string, z.ZodType> = {
   VerifyOtp: VerifyOtpSchema,
 };
 
-function jsonSchema(schema: z.ZodType): JsonObject {
-  const { $schema: _dialect, ...value } = z.toJSONSchema(schema);
+const inputComponentSchemas = new Set([
+  "AccessPageQuery",
+  "AuditQuery",
+  "AuthSessionListQuery",
+  "CreateRole",
+  "CreateUser",
+  "ReplacePermissionOverrides",
+  "ReplaceUserRoles",
+  "RequestOtp",
+  "UpdateRole",
+  "UpdateUser",
+  "UserPageQuery",
+  "UuidIdParams",
+  "VerifyOtp",
+]);
+
+function jsonSchema(
+  schema: z.ZodType,
+  io: "input" | "output" = "output",
+): JsonObject {
+  const { $schema: _dialect, ...value } = z.toJSONSchema(schema, { io });
   return value;
 }
 
@@ -96,6 +117,8 @@ function errorResponses(): Record<string, JsonObject> {
     "409": response("Conflict", "ErrorEnvelope"),
     "422": response("Validation failed", "ErrorEnvelope"),
     "429": response("Rate limited", "ErrorEnvelope"),
+    "502": response("Upstream delivery failed", "ErrorEnvelope"),
+    "503": response("Temporarily unavailable", "ErrorEnvelope"),
     "500": response("Unexpected error", "ErrorEnvelope"),
   };
 }
@@ -108,7 +131,7 @@ function requestBody(schemaName: string): JsonObject {
 }
 
 function queryParameters(schema: z.ZodType): JsonObject[] {
-  const value = jsonSchema(schema);
+  const value = jsonSchema(schema, "input");
   const properties =
     value.properties && typeof value.properties === "object"
       ? (value.properties as Record<string, JsonObject>)
@@ -129,10 +152,8 @@ function queryParameters(schema: z.ZodType): JsonObject[] {
 }
 
 function idParameter(): JsonObject {
-  const properties = jsonSchema(UuidIdParamsSchema).properties as Record<
-    string,
-    JsonObject
-  >;
+  const properties = jsonSchema(UuidIdParamsSchema, "input")
+    .properties as Record<string, JsonObject>;
   return {
     in: "path",
     name: "id",
@@ -141,18 +162,56 @@ function idParameter(): JsonObject {
   };
 }
 
+function originParameter(): JsonObject {
+  return {
+    in: "header",
+    name: "Origin",
+    required: true,
+    description: "Must equal the configured WEB_ORIGIN.",
+    schema: { type: "string", format: "uri" },
+  };
+}
+
+function csrfParameter(): JsonObject {
+  return {
+    in: "header",
+    name: "x-csrf-token",
+    required: true,
+    description:
+      "Must match the effect_csrf cookie for authenticated mutations.",
+    schema: jsonSchema(CsrfTokenSchema, "input"),
+  };
+}
+
+function securityRequirements(mode: SecurityMode): JsonObject[] {
+  if (mode === "public") return [];
+  if (mode === "refresh") return [{ RefreshCookieAuth: [] }];
+  return [{ AccessCookieAuth: [] }];
+}
+
 function operation(input: {
   operationId: string;
   tags: string[];
+  security?: SecurityMode;
+  mutation?: boolean;
   requestSchema?: string;
   parameters?: JsonObject[];
   successStatus: string;
   successSchema: string;
 }): JsonObject {
+  const mutation = input.mutation ?? false;
+  const security = input.security ?? "access";
+  const parameters = [
+    ...(input.parameters ?? []),
+    ...(mutation
+      ? [originParameter(), ...(security === "access" ? [csrfParameter()] : [])]
+      : []),
+  ];
   return {
     operationId: input.operationId,
     tags: input.tags,
-    ...(input.parameters ? { parameters: input.parameters } : {}),
+    security: securityRequirements(security),
+    ...(parameters.length ? { parameters } : {}),
     ...(input.requestSchema
       ? { requestBody: requestBody(input.requestSchema) }
       : {}),
@@ -167,6 +226,7 @@ function healthOperation(operationId: string): JsonObject {
   return {
     operationId,
     tags: ["health"],
+    security: [],
     responses: {
       "200": response("Healthy", "HealthResponse"),
       "503": response("Unavailable", "HealthResponse"),
@@ -197,6 +257,8 @@ export function buildOpenApiDocument(): JsonObject {
         post: operation({
           operationId: "AuthController_requestOtp",
           tags: ["auth"],
+          security: "public",
+          mutation: true,
           requestSchema: "RequestOtp",
           successStatus: "202",
           successSchema: "RequestOtpResponse",
@@ -206,6 +268,8 @@ export function buildOpenApiDocument(): JsonObject {
         post: operation({
           operationId: "AuthController_verifyOtp",
           tags: ["auth"],
+          security: "public",
+          mutation: true,
           requestSchema: "VerifyOtp",
           successStatus: "200",
           successSchema: "AuthSessionResponse",
@@ -215,6 +279,8 @@ export function buildOpenApiDocument(): JsonObject {
         post: operation({
           operationId: "AuthController_refresh",
           tags: ["auth"],
+          security: "refresh",
+          mutation: true,
           successStatus: "200",
           successSchema: "AuthSessionResponse",
         }),
@@ -223,6 +289,7 @@ export function buildOpenApiDocument(): JsonObject {
         post: operation({
           operationId: "AuthController_logout",
           tags: ["auth"],
+          mutation: true,
           successStatus: "200",
           successSchema: "OkResponse",
         }),
@@ -231,6 +298,7 @@ export function buildOpenApiDocument(): JsonObject {
         post: operation({
           operationId: "AuthController_logoutAll",
           tags: ["auth"],
+          mutation: true,
           successStatus: "200",
           successSchema: "OkResponse",
         }),
@@ -248,6 +316,7 @@ export function buildOpenApiDocument(): JsonObject {
         delete: operation({
           operationId: "AuthController_revokeSession",
           tags: ["sessions"],
+          mutation: true,
           parameters: [idParameter()],
           successStatus: "200",
           successSchema: "OkResponse",
@@ -272,6 +341,7 @@ export function buildOpenApiDocument(): JsonObject {
         post: operation({
           operationId: "UsersController_create",
           tags: ["users"],
+          mutation: true,
           requestSchema: "CreateUser",
           successStatus: "201",
           successSchema: "UserDto",
@@ -288,6 +358,7 @@ export function buildOpenApiDocument(): JsonObject {
         patch: operation({
           operationId: "UsersController_update",
           tags: ["users"],
+          mutation: true,
           parameters: [idParameter()],
           requestSchema: "UpdateUser",
           successStatus: "200",
@@ -298,6 +369,7 @@ export function buildOpenApiDocument(): JsonObject {
         post: operation({
           operationId: "UsersController_suspend",
           tags: ["users"],
+          mutation: true,
           parameters: [idParameter()],
           successStatus: "200",
           successSchema: "UserDto",
@@ -307,6 +379,7 @@ export function buildOpenApiDocument(): JsonObject {
         post: operation({
           operationId: "UsersController_activate",
           tags: ["users"],
+          mutation: true,
           parameters: [idParameter()],
           successStatus: "200",
           successSchema: "UserDto",
@@ -323,6 +396,7 @@ export function buildOpenApiDocument(): JsonObject {
         post: operation({
           operationId: "AccessControlController_createRole",
           tags: ["roles"],
+          mutation: true,
           requestSchema: "CreateRole",
           successStatus: "201",
           successSchema: "RoleDto",
@@ -332,6 +406,7 @@ export function buildOpenApiDocument(): JsonObject {
         patch: operation({
           operationId: "AccessControlController_updateRole",
           tags: ["roles"],
+          mutation: true,
           parameters: [idParameter()],
           requestSchema: "UpdateRole",
           successStatus: "200",
@@ -351,6 +426,7 @@ export function buildOpenApiDocument(): JsonObject {
         put: operation({
           operationId: "AccessControlController_replaceRoles",
           tags: ["users"],
+          mutation: true,
           parameters: [idParameter()],
           requestSchema: "ReplaceUserRoles",
           successStatus: "200",
@@ -361,6 +437,7 @@ export function buildOpenApiDocument(): JsonObject {
         put: operation({
           operationId: "AccessControlController_replaceOverrides",
           tags: ["users"],
+          mutation: true,
           parameters: [idParameter()],
           requestSchema: "ReplacePermissionOverrides",
           successStatus: "200",
@@ -378,10 +455,28 @@ export function buildOpenApiDocument(): JsonObject {
       },
     },
     components: {
+      securitySchemes: {
+        AccessCookieAuth: {
+          type: "apiKey",
+          in: "cookie",
+          name: "effect_access",
+          description: "Authenticated session access cookie.",
+        },
+        RefreshCookieAuth: {
+          type: "apiKey",
+          in: "cookie",
+          name: "effect_refresh",
+          description:
+            "Refresh-session cookie accepted only by the refresh endpoint.",
+        },
+      },
       schemas: Object.fromEntries(
         Object.entries(componentSchemas).map(([name, schema]) => [
           name,
-          jsonSchema(schema),
+          jsonSchema(
+            schema,
+            inputComponentSchemas.has(name) ? "input" : "output",
+          ),
         ]),
       ),
     },

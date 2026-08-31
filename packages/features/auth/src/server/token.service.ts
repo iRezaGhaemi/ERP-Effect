@@ -8,6 +8,7 @@ import {
 import { Inject, Injectable } from "@nestjs/common";
 import { z } from "zod";
 
+import { CSRF_TOKEN_BYTES } from "../contracts/index.js";
 import { AUTH_OPTIONS, type AuthOptions } from "./auth.options.js";
 
 const AccessTokenPayloadSchema = z.object({
@@ -91,7 +92,7 @@ export class TokenService {
   }
 
   generateCsrfToken(): string {
-    return randomBytes(32).toString("base64url");
+    return randomBytes(CSRF_TOKEN_BYTES).toString("base64url");
   }
 
   hashOpaqueToken(rawToken: string): string {
