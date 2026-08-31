@@ -8,6 +8,10 @@ import { AuthClient } from "./auth-client.js";
 
 type SessionClient = Pick<AuthClient, "listSessions" | "revokeSession" | "logoutAll">;
 
+function requiresLogin(error: unknown): boolean {
+  return error instanceof ApiError && ["AUTHENTICATION_REQUIRED", "SESSION_INVALID", "SESSION_REVOKED"].includes(error.code);
+}
+
 function localDate(value: string): string {
   return new Intl.DateTimeFormat("fa-IR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 }
@@ -28,7 +32,7 @@ export function SessionList({ client = new AuthClient(), onUnauthenticated }: { 
       setPage(await client.listSessions({ page: pageNumber }));
       setSelectedPage(pageNumber);
     } catch (loadError) {
-      if (loadError instanceof ApiError && ["SESSION_INVALID", "SESSION_REVOKED"].includes(loadError.code)) onUnauthenticated?.();
+      if (requiresLogin(loadError)) onUnauthenticated?.();
       else setError(loadError instanceof ApiError ? loadError.message : "دریافت نشست‌ها ممکن نشد. دوباره تلاش کنید.");
     } finally {
       setLoading(false);
@@ -45,7 +49,8 @@ export function SessionList({ client = new AuthClient(), onUnauthenticated }: { 
       setConfirmId(undefined);
       await load();
     } catch (revokeError) {
-      setError(revokeError instanceof ApiError ? revokeError.message : "لغو نشست ممکن نشد. دوباره تلاش کنید.");
+      if (requiresLogin(revokeError)) onUnauthenticated?.();
+      else setError(revokeError instanceof ApiError ? revokeError.message : "لغو نشست ممکن نشد. دوباره تلاش کنید.");
     } finally {
       setPendingId(undefined);
     }
@@ -58,7 +63,8 @@ export function SessionList({ client = new AuthClient(), onUnauthenticated }: { 
       await client.logoutAll();
       onUnauthenticated?.();
     } catch (logoutError) {
-      setError(logoutError instanceof ApiError ? logoutError.message : "خروج از نشست‌ها ممکن نشد. دوباره تلاش کنید.");
+      if (requiresLogin(logoutError)) onUnauthenticated?.();
+      else setError(logoutError instanceof ApiError ? logoutError.message : "خروج از نشست‌ها ممکن نشد. دوباره تلاش کنید.");
     } finally {
       setLoggingOut(false);
     }
