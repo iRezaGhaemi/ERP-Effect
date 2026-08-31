@@ -72,3 +72,26 @@ Task files changed:
 - deleted `src/24b-messenger.js`
 
 Concern: configured browser QA could not run because Chrome closed at launch.
+
+## Round 1 QA fix
+
+Recorded browser failure: QA25 reached the permission matrix and found 17
+rows after messenger removal, while its stale assertion required 18 and still
+labelled the matrix as `18 modules × actions`.
+
+The check now compares rendered `.perm-row` elements to runtime `MODS.length`.
+This asserts the UI renders every configured RBAC module and avoids another
+stale count when modules are intentionally added or removed.
+
+Verification:
+
+```sh
+node --test .testenv/ui-regressions.test.js
+# passed: 5 tests
+
+node .testenv/qa25.js
+# passed outside the sandbox: 32 checks, including 17/17 permission rows
+
+git diff --check
+# passed
+```

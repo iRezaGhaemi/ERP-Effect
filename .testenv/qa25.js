@@ -139,9 +139,9 @@ const ck=(id,p,d)=>{(p?OK:P).push((p?'✓ ':'✗ ')+id+(d?' — '+d:''));};
   // ماتریس دسترسی
   await pg.evaluate(()=>permDrawer('e2'));
   await pg.waitForTimeout(250);
-  v=await pg.evaluate(()=>({rows:document.querySelectorAll('.perm-row').length,toggles:document.querySelectorAll('.ptgl').length,
+  v=await pg.evaluate(()=>({rows:document.querySelectorAll('.perm-row').length,moduleCount:MODS.length,toggles:document.querySelectorAll('.ptgl').length,
     src:['از نقش','اختصاصی'].every(x=>document.body.innerText.includes(x))}));
-  ck('permission matrix (18 modules × actions)',v.rows===18&&v.toggles>40,v.rows+' rows, '+v.toggles+' toggles');
+  ck('permission matrix renders every configured module',v.rows===v.moduleCount&&v.toggles>40,v.rows+'/'+v.moduleCount+' rows, '+v.toggles+' toggles');
   ck('role vs override labels',v.src);
   // toggle: مالی را بگیر از سارا
   const before=await pg.evaluate(()=>canAs('e2','tasks'));
