@@ -194,7 +194,6 @@ function taskDrawer(id){
   `,footer:`
    ${can('tasks','e')?`<button class="btn btn-pr" onclick="taskEdit('${t.id}')">${ic('edit',14)} ویرایش تسک</button>`:''}
    <button class="btn btn-sec" onclick="closeDrawer();taskDone('${t.id}')" ${t.status==='done'?'disabled':''}>انجام شد</button>
-   <button class="btn btn-ghost" onclick="taskShare('${t.id}')">${ic('msg',14)} ارسال در پیام‌رسان</button>
    <button class="btn btn-ghost mr-auto" onclick="toast('info','لینک کپی شد','effectstudio.ir/erp/t/${t.id}')">${ic('link',14)} کپی لینک</button>
    ${can('tasks','d')?`<button class="ibtn ibtn-err" data-tip="حذف" onclick="confirmDlg('حذف تسک','از حذف این تسک مطمئن هستید؟ این عمل قابل بازگشت نیست.',()=>{TASKS.splice(TASKS.findIndex(x=>x.id==='${t.id}'),1);closeDrawer();render();toast('ok','تسک حذف شد')},'حذف تسک',true)">${ic('trash',15)}</button>`:''}`});
 }

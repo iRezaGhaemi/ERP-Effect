@@ -6,7 +6,7 @@
 
 The pnpm workspace implements single-company OTP login, users, roles,
 permissions/overrides, sessions, and append-only audit history.
-**CRM, finance, tasks, leave, messenger, and reports remain prototype-only.**
+**CRM, finance, tasks, leave, and reports remain prototype-only.**
 The standalone demo below is preserved; its demo OTP is not an API credential.
 
 ### Development

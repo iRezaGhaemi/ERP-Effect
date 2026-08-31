@@ -77,3 +77,30 @@ test('login branding exposes the current 2.6 version and primary color', t => {
   assert.match(favicon.toUpperCase(), /%236F6AEB/);
   assert.doesNotMatch(favicon.toUpperCase(), /%235E01A4/);
 });
+
+test('the product has no messenger entry points while tasks remain usable', t => {
+  const {window, document, errors} = loadApp(t);
+  window.location.hash = '#/dashboard';
+  window.render();
+  assert.doesNotMatch(document.querySelector('.sidebar')?.textContent ?? document.body.textContent, /پیام‌رسان/);
+  window.taskDrawer('t1');
+  assert.doesNotMatch(document.querySelector('.drawer').textContent, /ارسال در پیام‌رسان/);
+  assert.ok(document.getElementById('cmt-in'));
+  window.closeDrawer();
+  window.location.hash = '#/team/e2';
+  window.render();
+  assert.equal([...document.querySelectorAll('button')].some(button => button.textContent.trim() === 'پیام'), false);
+  window.location.hash = '#/messenger';
+  window.render();
+  assert.equal(document.querySelector('.msg-chat'), null);
+  assert.deepEqual(errors, []);
+});
+
+test('permission UI offers no messenger category or override', t => {
+  const {window, document, errors} = loadApp(t);
+  window.permDrawer('e9');
+
+  assert.doesNotMatch(document.querySelector('.drawer').textContent, /پیام‌رسان/);
+  assert.equal(document.querySelector('[data-mod="messenger"]'), null);
+  assert.deepEqual(errors, []);
+});

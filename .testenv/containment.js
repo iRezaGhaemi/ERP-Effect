@@ -13,7 +13,7 @@ const {browserLaunchOptions}=require('./browser');
     for(const r of ['dashboard','tasks','mytasks','calendar','crm','customers','customers/c1','leaves','finance','finance/invoices','finance/payroll','finance/exp','social','social/posts','social/report','team','team/e2','integrations','permissions','reports','notifications','settings','workspaces','cpro','cpro/cp2','cpro/cp3','cpro/cp4',
      'cpro/cp1|ov','cpro/cp1|tasks','cpro/cp1|assets','cpro/cp1|brand','cpro/cp1|plan','cpro/cp1|reports','cpro/cp1|members','cpro/cp1|settings',
      'team/e2|personal','team/e2|work','team/e2|bank','team/e2|acts','team/e2|pay',
-     'settings|labels','settings|theme','messenger','users',
+     'settings|labels','settings|theme','users',
      'customers/c1','customers/c1|assets','customers/c1|brand','customers/c1|projects',
      'finance/bank']){
       await pg.evaluate(rr=>{const [rt,tb]=rr.split('|');if(tb){if(rt.startsWith('cpro/'))S.tabs.cp=tb;else if(rt.startsWith('team/'))S.tabs.emp=tb;else if(rt.startsWith('customers/'))S.tabs.cust=tb;else if(rt==='settings')S.setTab=tb;else if(rt==='leaves')S.tabs.lv=tb;}location.hash='#/'+rt;},r);

@@ -220,7 +220,7 @@ const ck=(id,p,d)=>{(p?OK:P).push((p?'✓ ':'✗ ')+id+(d?' — '+d:''));};
     lock:document.getElementById('ovl').innerText.includes('مجوز ویرایش تسک')}));
   ck('unauthorized: NO edit button (hidden not disabled)',v.edit);
   ck('unauthorized: checklist read-only (view only)',v.ro&&v.noAdd&&v.lock);
-  await pg.evaluate(()=>{USER_OVERRIDES['e9']={messenger:{v:1}};S.uid='e1';S.role='r1';closeDrawer();render();});
+  await pg.evaluate(()=>{USER_OVERRIDES['e9']={reports:{v:1}};S.uid='e1';S.role='r1';closeDrawer();render();});
   await pg.waitForTimeout(200);
 
   // ===== I) style invariants on new UI =====

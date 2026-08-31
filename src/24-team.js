@@ -33,8 +33,7 @@ function teamProfile(id){
   const eproj=PRJ.filter(p=>p.lead===id||TASKS.some(t=>t.project===p.id&&t.assignee===id));
   const bal=LEAVE_BAL.find(b=>b.emp===id);
   return `<div class="pg">${pgHead(e.name,e.role+' · '+e.dept+' · همکاری از '+dFaL(e.start),
-   `<button class="btn btn-sec" onclick="toast('info','پیام','در نسخه متصل به پیام‌رسان فعال است.')">${ic('msg',14)} پیام</button>
-    <button class="btn btn-ghost" onclick="go('#/team')">${ic('arrowright',14)} بازگشت</button>`,
+   `<button class="btn btn-ghost" onclick="go('#/team')">${ic('arrowright',14)} بازگشت</button>`,
    [{t:'داشبورد'},{t:'تیم'},{t:e.name,h:'#/team'}])}
   <div class="card mb16"><div class="cust-hero" style="padding:16px 24px">
     <div class="col g8" style="align-items:flex-start">

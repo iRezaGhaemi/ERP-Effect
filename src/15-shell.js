@@ -11,7 +11,6 @@ const NAV=[
  {r:'crm',t:'CRM',icn:'crm',sub:[['crm/pipeline','سرنخ‌ها',LEADS.length],['crm/companies','شرکت‌ها',13],['crm/contacts','مخاطبین',11],['crm/opps','فرصت‌های فروش',5],['crm/acts','فعالیت‌ها',null]]},
  {r:'customers',t:'مشتریان',icn:'building'},
  {r:'cpro',t:'پروژه‌های مشتریان',icn:'briefcase'},
- {r:'messenger',t:'پیام‌رسان',icn:'msg'},
  {r:'leaves',t:'مرخصی',icn:'leave',badge:2},
  {sec:'مدیریت'},
  {r:'finance',t:'مالی',icn:'wallet',sub:[['finance/in','دریافت‌ها',null],['finance/pay','پرداخت‌ها',null],['finance/invoices','فاکتورها',12],['finance/proforma','پیش‌فاکتورها',5],['finance/payroll','پرداخت پرسنل',null],['finance/bank','اطلاعات بانکی پرسنل',null],['finance/tx','تراکنش‌ها',null]]},
@@ -47,9 +46,9 @@ function shellHtml(pageHtml,route){
     <nav class="sb-nav">
     ${navFinal.map(n=>n.sec?`<div class="sb-sec">${n.sec}</div>`:
       n.sub?`<div class="sb-grp ${isOpen(n)?'open':''}">
-        <button class="sb-item" onclick="this.parentElement.classList.toggle('open')">${ic(n.icn,17)}<span>${n.t}</span>${n.r==='messenger'&&typeof CHATS!=='undefined'&&CHATS.reduce((a,c)=>a+(c.unread||0),0)?`<span class="n-badge">${fa(CHATS.reduce((a,c)=>a+(c.unread||0),0))}</span>`:n.badge?`<span class="n-badge">${fa(n.badge)}</span>`:''}${ic('chevdown',13,'chev')}</button>
+        <button class="sb-item" onclick="this.parentElement.classList.toggle('open')">${ic(n.icn,17)}<span>${n.t}</span>${n.badge?`<span class="n-badge">${fa(n.badge)}</span>`:''}${ic('chevdown',13,'chev')}</button>
         <div class="sb-sub">${(n._sub||n.sub).map(s=>`<button class="${('#/'+s[0])==='#/'+route.split('/')[0]+'/'+(route.split('/')[1]||'')?'on':''}" onclick="go('#/${s[0]}')">${s[1]}${s[2]!=null?`<span class="cnt">${fa(s[2])}</span>`:''}</button>`).join('')}</div></div>`
-      :`<button class="sb-item ${route.split('/')[0]===n.r?'on':''}" onclick="go('#/${n.r}')">${ic(n.icn,17)}<span>${n.t}</span>${n.r==='messenger'&&typeof CHATS!=='undefined'&&CHATS.reduce((a,c)=>a+(c.unread||0),0)?`<span class="n-badge">${fa(CHATS.reduce((a,c)=>a+(c.unread||0),0))}</span>`:n.badge?`<span class="n-badge">${fa(n.badge)}</span>`:''}${n.dot?`<span class="p-dot" data-tip="خطای اتصال"></span>`:''}</button>`).join('')}
+      :`<button class="sb-item ${route.split('/')[0]===n.r?'on':''}" onclick="go('#/${n.r}')">${ic(n.icn,17)}<span>${n.t}</span>${n.badge?`<span class="n-badge">${fa(n.badge)}</span>`:''}${n.dot?`<span class="p-dot" data-tip="خطای اتصال"></span>`:''}</button>`).join('')}
     </nav>
     <div class="sb-user">${av('رضا قایمی','lg')}
       <div class="nm"><b>رضا قایمی</b><span>مدیرعامل</span></div>

@@ -78,79 +78,21 @@ const ck=(id,p,d)=>{(p?OK:P).push((p?'✓ ':'✗ ')+id+(d?' — '+d:''));};
   ck('popup content complete',v.hello&&v.sub&&v.msn&&v.btns&&v.metrics);
   await pg.evaluate(()=>closeModal());
 
-  // ===== 4-7) پیام‌رسان =====
-  await pg.evaluate(()=>{location.hash='#/messenger';render();});
-  await pg.waitForTimeout(300);
-  v=await pg.evaluate(()=>({nav:!!document.querySelector('.sb [data-tip], .sb'),item:[...document.querySelectorAll('.sb-item span')].some(x=>x.textContent.trim()==='پیام‌رسان'),
-    list:document.querySelectorAll('.msg-item').length,tabs:['همه','خوانده نشده','گروه‌ها'].every(t=>document.body.innerText.includes(t)),
-    unread:document.querySelectorAll('.unread-cnt').length,photos:document.querySelectorAll('.msg-list .av.photo').length}));
-  ck('sidebar has پیام‌رسان',v.item);
-  ck('conversation list (5+)',v.list>=5,v.list+' chats, '+v.photos+' photo avatars');
-  ck('tabs + unread badges',v.tabs&&v.unread>=2,v.unread+' unread badges');
-  // چیدمان راست=لیست
-  const sides=await pg.evaluate(()=>{const l=document.querySelector('.msg-list').getBoundingClientRect();const c=document.querySelector('.msg-chat').getBoundingClientRect();return l.right>c.right;});
-  ck('RTL: list on RIGHT',sides);
-  // باز کردن گفتگو + حباب‌ها + ارجاع
-  await pg.evaluate(()=>msgOpen('ch1'));
-  await pg.waitForTimeout(250);
-  v=await pg.evaluate(()=>({bubbles:document.querySelectorAll('.msg-b').length,out:document.querySelectorAll('.msg-b.out').length,
-    mention:!!document.querySelector('.mention'),ref:!!document.querySelector('.msg-ref'),att:document.querySelectorAll('.msg-att').length,
-    header:document.body.innerText.includes('سارا احمدی')}));
-  ck('chat opens with bubbles',v.bubbles>=4&&v.out>=1&&v.header,v.bubbles+' bubbles ('+v.out+' out)');
-  ck('mention highlight + clickable',v.mention);
-  ck('entity reference card',v.ref,'task/inv ref card rendered');
-  ck('file/image attachments',v.att>=1);
-  // ارسال پیام با منشن popover
-  await pg.fill('#msg-in','تست v2.5 @س');
-  await pg.evaluate(()=>msgTaInput(document.getElementById('msg-in')));
-  await pg.waitForTimeout(150);
-  const pop=await pg.evaluate(()=>document.querySelectorAll('#mention-pop button').length);
-  ck('@ opens searchable list',pop>=1,pop+' suggestions');
-  await pg.evaluate(()=>{const b0=document.querySelector('#mention-pop button');if(b0)b0.click();});
-  await pg.waitForTimeout(250);
-  const draftOK=await pg.evaluate(()=>{const t=document.getElementById('msg-in');return !!t&&t.value.includes('@سارا احمدی');});
-  await pg.evaluate(()=>msgSend('ch1'));
-  await pg.waitForTimeout(250);
-  const sent=await pg.evaluate(()=>{const c=chatById('ch1');return c.msgs[c.msgs.length-1].text.includes('@سارا احمدی');})&&draftOK;
-  ck('mention inserted + sent',sent);
-  // ارجاع با #
-  await pg.evaluate(()=>refPicker());
-  await pg.waitForTimeout(200);
-  const refItems=await pg.evaluate(()=>document.querySelectorAll('.ap-list .ap-item').length);
-  ck('# reference picker (entities)',refItems>=3,refItems+' items');
-  await pg.evaluate(()=>{refInsert('task','t1');});
-  await pg.waitForTimeout(200);
-  await pg.fill('#msg-in','این تسک را ببینید');
-  await pg.evaluate(()=>msgSend('ch1'));
-  await pg.waitForTimeout(300);
-  const lastRef=await pg.evaluate(()=>{const c=chatById('ch1');return !!c.msgs[c.msgs.length-1].ref;});
-  ck('reference card sent in message',lastRef);
-  // پاسخ نمونه + اعلان
-  await pg.waitForTimeout(1900);
-  const notif=await pg.evaluate(()=>NOTIFS.some(n=>n.t.includes('پیام جدید')));
-  ck('message notification',notif);
-  // گروه
-  await pg.evaluate(()=>grpModal());
-  await pg.waitForTimeout(200);
-  await pg.fill('#grp-n','تست گروه v2.5');
-  await pg.evaluate(()=>{GRP_SEL=['e1','e2','e3'];grpCreate();});
-  await pg.waitForTimeout(250);
-  v=await pg.evaluate(()=>{const c=CHATS[0];return {g:c.type==='grp'&&c.name==='تست گروه v2.5',mem:c.members.length};});
-  ck('group created (flow)',v.g&&v.mem===3);
-  v=await pg.evaluate(()=>{const c=CHATS.find(x=>x.name==='تست گروه v2.5');grpAddMember(c.id);return true;});
-  // اشتراک تسک
-  await pg.evaluate(()=>{location.hash='#/tasks';render();});
-  await pg.waitForTimeout(250);
+  // ===== 4) پیام‌رسان حذف شده است =====
+  v=await pg.evaluate(()=>{
+    location.hash='#/dashboard';render();
+    return {nav:document.body.innerText.includes('پیام‌رسان'),chat:!!document.querySelector('.msg-chat')};
+  });
+  ck('no messenger navigation or chat surface',!v.nav&&!v.chat);
   await pg.evaluate(()=>{const t=TASKS[0];taskDrawer(t.id);});
-  await pg.waitForTimeout(250);
-  const shareBtn=await pg.evaluate(()=>document.body.innerText.includes('ارسال در پیام‌رسان'));
-  ck('task → share to messenger',shareBtn);
-  await pg.evaluate(()=>{const t=TASKS[0];closeDrawer();taskShare(t.id);});
   await pg.waitForTimeout(200);
-  await pg.evaluate(()=>{const c=CHATS.find(x=>x.type==='dm');taskShareDo(c.id,TASKS[0].id);});
+  const taskStillWorks=await pg.evaluate(()=>!!document.getElementById('cmt-in')&&!document.getElementById('ovl').innerText.includes('ارسال در پیام‌رسان'));
+  ck('task comments remain available without messenger share',taskStillWorks);
+  await pg.evaluate(()=>{closeDrawer();permDrawer('e9');});
   await pg.waitForTimeout(200);
-  const shared=await pg.evaluate(()=>{const c=CHATS.find(x=>x.type==='dm');return c.msgs.some(m=>m.ref&&m.ref.k==='task');});
-  ck('task shared as rich card',shared);
+  const noMessengerPermission=await pg.evaluate(()=>!document.getElementById('ovl').innerText.includes('پیام‌رسان')&&!document.querySelector('[data-mod="messenger"]'));
+  ck('no messenger permission category or override',noMessengerPermission);
+  await pg.evaluate(()=>closeDrawer());
 
   // ===== 11-12) مسئولین چندگانه =====
   await pg.evaluate(()=>{location.hash='#/tasks';render();});
@@ -219,14 +161,14 @@ const ck=(id,p,d)=>{(p?OK:P).push((p?'✓ ':'✗ ')+id+(d?' — '+d:''));};
   ck('SuperAdmin protected',sa);
   await pg.evaluate(()=>closeDrawer());
   // کاربر بدون دسترسی: e9 (کارمند، بدون CRM) — ناوبری مخفی
-  await pg.evaluate(()=>{S.uid='e9';S.role='r5';location.hash='#/dashboard';render();});
+  await pg.evaluate(()=>{USER_OVERRIDES['e9']={reports:{v:1}};S.uid='e9';S.role='r5';location.hash='#/dashboard';render();});
   await pg.waitForTimeout(300);
   v=await pg.evaluate(()=>({crm:[...document.querySelectorAll('.sb-item span')].some(x=>x.textContent.trim()==='CRM'),
     fin:[...document.querySelectorAll('.sb-item span')].some(x=>x.textContent.trim()==='مالی'),
     team:[...document.querySelectorAll('.sb-item span')].some(x=>x.textContent.trim()==='تیم'),
-    msg:[...document.querySelectorAll('.sb-item span')].some(x=>x.textContent.trim()==='پیام‌رسان')}));
+    reports:[...document.querySelectorAll('.sb-item span')].some(x=>x.textContent.trim()==='گزارش‌ها')}));
   ck('unauthorized nav hidden (CRM/مالی/تیم)',!v.crm&&!v.fin&&!v.team,'CRM='+v.crm+', مالی='+v.fin+', تیم='+v.team);
-  ck('override grants messenger (e9)',v.msg);
+  ck('override grants reports (e9)',v.reports);
   // روت غیرمجاز
   await pg.evaluate(()=>{location.hash='#/crm';render();});
   await pg.waitForTimeout(200);
