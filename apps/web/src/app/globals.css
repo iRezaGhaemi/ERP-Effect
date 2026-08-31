@@ -1,23 +1,58 @@
-* {
-  box-sizing: border-box;
-}
+@import "@effect/ui/tokens.css";
 
-html,
-body {
-  margin: 0;
-  min-height: 100%;
-}
+* { box-sizing: border-box; }
 
-body {
-  display: grid;
-  min-height: 100vh;
-  place-items: center;
-  background: #f8fafc;
-  color: #0f172a;
-  font-family: Arial, sans-serif;
-}
+html, body { margin: 0; min-height: 100%; }
+body { min-height: 100vh; background: var(--effect-page); color: var(--effect-text); font-family: var(--effect-font); }
+button, input { font: inherit; }
+button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid color-mix(in srgb, var(--effect-primary) 32%, transparent); outline-offset: 2px; }
 
-main {
-  font-size: 1.25rem;
-  font-weight: 600;
-}
+.effect-button { min-height: 44px; border: 1px solid transparent; border-radius: var(--effect-radius); padding: 0 var(--effect-space-4); cursor: pointer; font-weight: 600; transition: background-color 160ms ease, border-color 160ms ease; }
+.effect-button:disabled { cursor: wait; opacity: .62; }
+.effect-button--full { width: 100%; }
+.effect-button--primary { background: var(--effect-primary); color: white; }
+.effect-button--primary:not(:disabled):hover { background: var(--effect-primary-dark); }
+.effect-button--secondary { background: var(--effect-surface); border-color: var(--effect-border); color: var(--effect-text); }
+.effect-button--secondary:not(:disabled):hover { border-color: var(--effect-primary); color: var(--effect-primary-dark); }
+.effect-button--danger { background: var(--effect-danger); color: white; }
+.effect-button--ghost { background: transparent; color: var(--effect-text-muted); }
+
+.effect-field { display: grid; gap: var(--effect-space-2); text-align: right; }
+.effect-field__label { color: var(--effect-text); font-size: 14px; font-weight: 600; }
+.effect-field__control { display: flex; min-height: 48px; overflow: hidden; border: 1px solid var(--effect-border); border-radius: var(--effect-radius); background: var(--effect-subtle); }
+.effect-field__control:focus-within { border-color: var(--effect-primary); }
+.effect-field__control--error { border-color: var(--effect-danger); }
+.effect-field__prefix { display: grid; place-items: center; padding: 0 var(--effect-space-3); border-left: 1px solid var(--effect-border); color: var(--effect-text-muted); font-family: var(--effect-font); font-weight: 500; }
+.effect-field__input { width: 100%; min-width: 0; border: 0; background: transparent; color: var(--effect-text); padding: 0 var(--effect-space-3); text-align: right; }
+.effect-field__input:focus { outline: 0; }
+.effect-field__hint, .effect-field__error { margin: 0; font-size: 12px; }
+.effect-field__hint { color: var(--effect-text-muted); }.effect-field__error { color: var(--effect-danger); }
+
+.effect-auth-page { display: grid; grid-template-columns: 1fr 1fr; height: 100vh; background: var(--effect-page); }
+.effect-auth-art { position: relative; height: 100vh; overflow: hidden; }
+.effect-auth-art::after { position: absolute; inset: 0; content: ""; background: rgb(111 106 235 / 16%); pointer-events: none; }
+.effect-auth-art img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.effect-auth-side { display: flex; height: 100vh; padding: 40px 24px; }
+.effect-auth-card { width: min(100%, 420px); margin: auto; padding: 32px; border: 1px solid var(--effect-border); border-radius: var(--effect-radius); background: var(--effect-surface); }
+.effect-login-form { display: grid; gap: var(--effect-space-4); }
+.effect-login-brand { display: flex; flex-direction: column; align-items: center; gap: var(--effect-space-3); text-align: center; }
+.effect-login-brand h1 { margin: 0; font-size: 22px; font-weight: 700; }
+.effect-brand__mark { display: inline-grid; width: 52px; height: 52px; place-items: center; border-radius: 12px; background: var(--effect-primary); color: white; font-weight: 700; }
+.effect-login-copy { margin: -8px 0 8px; color: var(--effect-text-muted); font-size: 14px; line-height: 1.8; text-align: center; }
+.effect-otp-row { display: flex; justify-content: center; gap: 8px; }
+.effect-otp-input { width: 46px; height: 54px; border: 1px solid var(--effect-border); border-radius: var(--effect-radius); background: var(--effect-subtle); color: var(--effect-text); font-size: 22px; font-weight: 500; text-align: center; }
+.effect-otp-input:focus { border-color: var(--effect-primary); outline: 0; }.effect-otp-input:disabled { opacity: .6; }
+.effect-form-error { margin: -4px 0 0; color: var(--effect-danger); font-size: 13px; text-align: center; }
+.effect-login-actions { display: flex; align-items: center; justify-content: space-between; gap: var(--effect-space-2); font-size: 12px; }
+.effect-link-button { border: 0; background: transparent; color: var(--effect-primary-dark); cursor: pointer; padding: 4px; }.effect-link-button:disabled { color: var(--effect-text-muted); cursor: wait; }.effect-countdown { color: var(--effect-text-muted); font-variant-numeric: tabular-nums; }
+
+.effect-shell { display: flex; min-height: 100vh; background: var(--effect-page); }
+.effect-sidebar { display: flex; width: 252px; flex: none; flex-direction: column; gap: 32px; padding: 20px 12px; border-left: 1px solid var(--effect-border); background: var(--effect-surface); }
+.effect-brand { display: flex; align-items: center; gap: 10px; color: var(--effect-text); font-weight: 700; text-decoration: none; }.effect-brand .effect-brand__mark { width: 32px; height: 32px; border-radius: 9px; }
+.effect-sidebar__label { margin: 0 8px 8px; color: var(--effect-text-muted); font-size: 11px; font-weight: 600; }.effect-sidebar__link { display: block; margin: 2px 0; border-radius: 8px; color: var(--effect-text-muted); padding: 10px 8px; text-decoration: none; }.effect-sidebar__link:hover { background: var(--effect-primary-soft); color: var(--effect-primary-dark); }
+.effect-app-main { min-width: 0; flex: 1; }.effect-topbar { height: 60px; display: flex; align-items: center; padding: 0 32px; border-bottom: 1px solid var(--effect-border); background: var(--effect-surface); }.effect-topbar h1 { margin: 0; font-size: 16px; }.effect-app-content { max-width: 1000px; padding: 32px; }
+.effect-dashboard-card, .effect-session-list { border: 1px solid var(--effect-border); border-radius: var(--effect-radius); background: var(--effect-surface); }.effect-dashboard-card { padding: 24px; }.effect-dashboard-card h2, .effect-session-list h2 { margin: 0 0 8px; font-size: 18px; }.effect-dashboard-card p, .effect-session-list p { margin: 0; color: var(--effect-text-muted); line-height: 1.8; }
+.effect-session-list__header { display: flex; align-items: start; justify-content: space-between; gap: 16px; padding: 20px; border-bottom: 1px solid var(--effect-border); }.effect-session-list ul { padding: 0; margin: 0; list-style: none; }.effect-session { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 20px; border-bottom: 1px solid var(--effect-border); }.effect-session:last-child { border-bottom: 0; }.effect-session h3 { margin: 0 0 6px; font-size: 14px; }.effect-current { display: inline-block; margin-right: 6px; border-radius: 99px; background: var(--effect-primary-soft); color: var(--effect-primary-dark); padding: 1px 8px; font-size: 11px; }.effect-session__action { display: flex; align-items: center; flex-wrap: wrap; justify-content: end; gap: 8px; font-size: 12px; }.effect-session-list__pagination { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px; border-top: 1px solid var(--effect-border); color: var(--effect-text-muted); font-size: 12px; }.effect-session-list__pagination div { display: flex; gap: 8px; }.effect-session-list__pagination .effect-button { min-height: 36px; }.effect-state { display: grid; justify-items: start; gap: 12px; padding: 24px; border: 1px solid var(--effect-border); border-radius: var(--effect-radius); background: var(--effect-surface); color: var(--effect-text-muted); }.effect-state--error { border-color: var(--effect-danger); }
+
+@media (max-width: 900px) { .effect-auth-page { grid-template-columns: 1fr; height: auto; min-height: 100vh; }.effect-auth-art { display: none; }.effect-auth-side { min-height: 100vh; height: auto; padding: 24px 16px; }.effect-sidebar { display: none; }.effect-app-content { padding: 20px 16px; }.effect-topbar { padding: 0 16px; }.effect-session, .effect-session-list__header { align-items: stretch; flex-direction: column; }.effect-session__action { justify-content: start; } }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; transition-duration: 0.01ms !important; } }

@@ -2,6 +2,7 @@
   "name": "@effect/web",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "build": "next build",
     "dev": "next dev",
@@ -11,7 +12,9 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@effect/auth": "workspace:*",
     "@effect-erp/contracts": "workspace:*",
+    "@effect/ui": "workspace:*",
     "next": "^16.3.3",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"

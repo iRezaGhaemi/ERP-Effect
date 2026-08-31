@@ -1,0 +1,46 @@
+@font-face {
+  font-family: "IRANSansX";
+  src: url("/fonts/IRANSansX-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "IRANSansX";
+  src: url("/fonts/IRANSansX-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "IRANSansX";
+  src: url("/fonts/IRANSansX-DemiBold.woff2") format("woff2");
+  font-weight: 600 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --effect-primary: #6f6aeb;
+  --effect-primary-dark: #5049c7;
+  --effect-primary-soft: #eeedff;
+  --effect-page: #f6f6f8;
+  --effect-surface: #ffffff;
+  --effect-subtle: #f9f9fb;
+  --effect-border: #e7e7eb;
+  --effect-text: #24242b;
+  --effect-text-muted: #72727d;
+  --effect-danger: #cf4154;
+  --effect-danger-soft: #fff0f2;
+  --effect-success: #19865b;
+  --effect-radius: 12px;
+  --effect-space-1: 4px;
+  --effect-space-2: 8px;
+  --effect-space-3: 12px;
+  --effect-space-4: 16px;
+  --effect-space-5: 24px;
+  --effect-space-6: 32px;
+  --effect-font: "IRANSansX", Arial, sans-serif;
+}
