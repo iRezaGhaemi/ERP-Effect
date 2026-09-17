@@ -47,4 +47,4 @@
 - migration و seed تکرارپذیر، کاربر runtime کم‌دسترسی PostgreSQL، Docker/Compose، healthcheck، CI و OpenAPI تحویل شدند.
 - `lint`، `typecheck`، unit، integration، API E2E (۲۴/۲۴)، build تولید، smoke و QA کامل Chromium پاس شدند. OpenAPI پس از تولید مجدد بدون drift بود.
 - اجرای کامل Compose روی دیتابیس خالی و فلو واقعی Playwright در پذیرش همین تغییرات پاس شده است. بازاجرای نهایی imageها را ساخت، اما کمبود فضای میزبان Docker پیش از ایجاد کانتینر خطای زیرساختی داد؛ برای جلوگیری از توقف کانتینرهای نامرتبط کاربر، Docker Desktop مجدداً راه‌اندازی نشد.
-- SHA محلی و remote پس از push تحویل در این بخش ثبت می‌شوند.
+- commit تحویل: `4c3ad42b526f279fe0c9e260526860380212c9ca`؛ SHA محلی و شاخهٔ remote `codex/foundation-identity` پس از push دقیقاً یکسان تأیید شدند.
