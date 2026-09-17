@@ -6,6 +6,7 @@ import {
   HttpStatus,
 } from "@nestjs/common";
 import { DomainError, type FieldErrors } from "@effect-erp/contracts";
+import { RateLimitError } from "@effect/auth/server";
 import { z } from "zod";
 
 type HttpRequest = {
@@ -60,13 +61,16 @@ function domainStatus(code: string): number {
   if (
     code === "AUTHENTICATION_REQUIRED" ||
     code === "SESSION_INVALID" ||
-    code === "SESSION_REVOKED"
+    code === "SESSION_REVOKED" ||
+    code === "INVALID_CREDENTIALS"
   )
     return HttpStatus.UNAUTHORIZED;
   if (
     code === "PERMISSION_DENIED" ||
     code === "ORIGIN_INVALID" ||
-    code === "CSRF_INVALID"
+    code === "CSRF_INVALID" ||
+    code === "PASSWORD_CHANGE_REQUIRED" ||
+    code === "SELF_ADMIN_RESET_FORBIDDEN"
   )
     return HttpStatus.FORBIDDEN;
   if (
@@ -76,11 +80,14 @@ function domainStatus(code: string): number {
     code === "SESSION_NOT_FOUND"
   )
     return HttpStatus.NOT_FOUND;
-  if (code === "PHONE_ALREADY_EXISTS" || code === "ROLE_ALREADY_EXISTS")
+  if (
+    code === "PHONE_ALREADY_EXISTS" ||
+    code === "USERNAME_ALREADY_EXISTS" ||
+    code === "ROLE_ALREADY_EXISTS"
+  )
     return HttpStatus.CONFLICT;
   if (code === "RATE_LIMITED") return HttpStatus.TOO_MANY_REQUESTS;
-  if (code === "SMS_DELIVERY_FAILED") return HttpStatus.BAD_GATEWAY;
-  if (code === "OTP_REQUEST_UNAVAILABLE") return HttpStatus.SERVICE_UNAVAILABLE;
+  if (code === "PASSWORD_HASH_BUSY") return HttpStatus.SERVICE_UNAVAILABLE;
   return HttpStatus.UNPROCESSABLE_ENTITY;
 }
 
@@ -144,6 +151,8 @@ export class DomainExceptionFilter implements ExceptionFilter {
     response.setHeader("x-request-id", currentRequestId);
 
     if (exception instanceof DomainError) {
+      if (exception instanceof RateLimitError)
+        response.setHeader("Retry-After", String(exception.retryAfterSeconds));
       response.status(domainStatus(exception.code)).json({
         error: {
           code: exception.code,

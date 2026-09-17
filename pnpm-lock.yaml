@@ -401,6 +401,9 @@ importers:
         specifier: ^0.3.28
         version: 0.3.31(pg@8.23.0)
     devDependencies:
+      '@effect-erp/testing':
+        specifier: workspace:*
+        version: link:../testing
       '@types/node':
         specifier: ^24.0.0
         version: 24.13.3

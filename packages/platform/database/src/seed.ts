@@ -7,13 +7,25 @@ import {
   UserRoleEntity,
 } from "@effect/access-control/entities";
 import { AuditWriter } from "@effect/audit/server";
+import { NewPasswordSchema, UsernameSchema } from "@effect/users/contracts";
 import { UserEntity, UserStatus } from "@effect/users/entities";
-import { normalizeIranianMobile } from "@effect/users/server";
+import {
+  normalizeIranianMobile,
+  passwordHasher,
+  UserCredentialsService,
+} from "@effect/users/server";
 import type { DataSource } from "typeorm";
+
+export type InitialCredentials = { username: string; password: string };
 
 const permissionCatalog = [
   { key: "users:read", resource: "users", action: "read" },
   { key: "users:create", resource: "users", action: "create" },
+  {
+    key: "users:credentials:manage",
+    resource: "users",
+    action: "credentials:manage",
+  },
   { key: "users:update", resource: "users", action: "update" },
   { key: "users:suspend", resource: "users", action: "suspend" },
   { key: "roles:manage", resource: "roles", action: "manage" },
@@ -33,9 +45,11 @@ function sameIds(actual: string[], expected: string[]): boolean {
 export async function seedInitialAccess(
   dataSource: DataSource,
   initialAdminPhone: string,
+  credentials?: InitialCredentials,
 ): Promise<void> {
   const phone = normalizeIranianMobile(initialAdminPhone);
   const audit = new AuditWriter(dataSource);
+  const credentialService = new UserCredentialsService(dataSource);
   await dataSource.transaction(async (manager) => {
     await manager.query(
       `SELECT pg_advisory_xact_lock(hashtextextended('initial-access-seed', 0))`,
@@ -59,6 +73,34 @@ export async function seedInitialAccess(
             .getRepository(UserRoleEntity)
             .exist({ where: { userId: existingUser.id, roleId: role.id } })
         : false;
+    if (existingUser && (!role || !hadAssignment)) {
+      throw new Error(
+        "Bootstrap phone does not identify the initial system administrator.",
+      );
+    }
+    const credentialsMissing =
+      !existingUser ||
+      existingUser.username === null ||
+      existingUser.passwordHash === null;
+    if (credentialsMissing && !credentials) {
+      throw new Error(
+        "Initial administrator credentials are required for bootstrap.",
+      );
+    }
+    const initialCredentials = credentialsMissing
+      ? {
+          username: UsernameSchema.parse(credentials!.username),
+          password: NewPasswordSchema.parse(credentials!.password),
+        }
+      : null;
+    if (initialCredentials) {
+      const usernameOwner = await userRepository.findOneBy({
+        username: initialCredentials.username,
+      });
+      if (usernameOwner && usernameOwner.id !== existingUser?.id) {
+        throw new Error("Initial administrator username is already assigned.");
+      }
+    }
     const catalogWasExact = permissionCatalog.every((expected) => {
       const actual = existingPermissions.find(
         ({ key }) => key === expected.key,
@@ -69,7 +111,6 @@ export async function seedInitialAccess(
       );
     });
     const roleWasExact = role?.name === "مدیر ارشد" && role.isSystem === true;
-    const userWasActive = existingUser?.status === UserStatus.ACTIVE;
     const existingPermissionIds = existingPermissions
       .filter(({ key }) => permissionKeySet.has(key))
       .map(({ id }) => id);
@@ -80,9 +121,9 @@ export async function seedInitialAccess(
     const wasComplete =
       catalogWasExact &&
       roleWasExact &&
-      userWasActive &&
       grantsWereExact &&
-      hadAssignment;
+      hadAssignment &&
+      !credentialsMissing;
     const hadExistingSeedState =
       existingPermissions.length > 0 || role !== null || existingUser !== null;
 
@@ -135,10 +176,15 @@ export async function seedInitialAccess(
         firstName: "مدیر",
         lastName: "سیستم",
         status: UserStatus.ACTIVE,
+        username: null,
+        passwordHash: null,
+        mustChangePassword: true,
+        temporaryPasswordExpiresAt: null,
+        passwordChangedAt: null,
+        credentialVersion: 0,
+        lastLoginAt: null,
       });
-    if (user.status !== UserStatus.ACTIVE) user.status = UserStatus.ACTIVE;
-    const savedUser =
-      !existingUser || !userWasActive ? await userRepository.save(user) : user;
+    const savedUser = !existingUser ? await userRepository.save(user) : user;
     if (!hadAssignment)
       await manager
         .createQueryBuilder()
@@ -147,6 +193,16 @@ export async function seedInitialAccess(
         .values({ userId: savedUser.id, roleId: role.id })
         .orIgnore()
         .execute();
+
+    if (initialCredentials) {
+      const hash = await passwordHasher.hash(initialCredentials.password);
+      await credentialService.setTemporary(
+        savedUser,
+        initialCredentials.username,
+        hash,
+        manager,
+      );
+    }
 
     if (!wasComplete) {
       await audit.write(

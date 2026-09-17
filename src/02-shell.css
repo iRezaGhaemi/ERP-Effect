@@ -16,20 +16,6 @@
 .logo-mark{width:52px;height:52px;border-radius:15px;background:var(--pr);display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:none;}
 .logo-mark.sm{width:30px;height:30px;border-radius:9px;box-shadow:none;}
 .logo-mark.lg{width:64px;height:64px;border-radius:18px}
-.otp-row{display:flex;gap:12px;direction:rtl;justify-content:center}
-.otp-box{width:46px;height:54px;text-align:center;font-size:22px;font-weight:500;background:var(--s2);border:1.5px solid var(--bd);border-radius:var(--r-md);color:var(--t1);transition:all var(--tr);font-family:var(--f)}
-.otp-box:focus{border-color:var(--pr);outline:2px solid var(--pr-soft2);outline-offset:-1px}
-.otp-box.filled{border-color:var(--pr2);background:var(--pr-soft)}
-.otp-box.err{border-color:var(--err);outline:2px solid var(--err-soft);animation:shake .4s}
-@keyframes shake{0%,100%{transform:none}25%{transform:translateX(4px)}75%{transform:translateX(-4px)}}
-.phone-inp{display:flex;align-items:stretch;gap:0;border:1px solid var(--bd);border-radius:var(--r-md);overflow:hidden;background:var(--s2);transition:all var(--tr)}
-.phone-inp:focus-within{border-color:var(--pr);outline:2px solid var(--pr-soft2);outline-offset:-2px}
-.phone-inp .pre{display:flex;align-items:center;gap:8px;padding:0 12px;background:var(--s3);border-left:1px solid var(--bd);color:var(--t2);font-size:13.5px;font-weight:600;white-space:nowrap}
-.phone-inp input{flex:1;border:0;background:transparent;color:var(--t1);font-size:15px;font-weight:600;padding:0 16px;height:46px;letter-spacing:1px;direction:ltr;text-align:right}
-.phone-inp input:focus{outline:none}
-.auth-ok{display:flex;flex-direction:column;align-items:center;gap:16px;padding:8px 0 4px}
-.ok-ring{width:74px;height:74px;border-radius:99px;background:var(--ok-soft);display:flex;align-items:center;justify-content:center;color:var(--ok);animation:pop .45s cubic-bezier(.2,1.4,.4,1)}
-@keyframes pop{from{transform:scale(.5);opacity:0}to{transform:scale(1);opacity:1}}
 
 /* ---------- shell frame ---------- */
 .shell{display:flex;min-height:100vh;flex-direction:row;background:var(--bg)}

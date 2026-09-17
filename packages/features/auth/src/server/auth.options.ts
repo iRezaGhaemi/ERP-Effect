@@ -1,7 +1,5 @@
 export type AuthOptions = {
-  pepper: string;
-  ttlSeconds: number;
-  resendSeconds: number;
+  rateLimitSecret: string;
   jwtAccessSecret: string;
   accessTtlSeconds: number;
   refreshTtlDays: number;

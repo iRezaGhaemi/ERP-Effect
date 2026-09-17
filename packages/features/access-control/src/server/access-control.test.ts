@@ -20,6 +20,7 @@ function createResolver(overrides: Partial<AccessControlRepository> = {}) {
     isUserActive: vi.fn().mockResolvedValue(true),
     getOverride: vi.fn().mockResolvedValue(null),
     hasRoleGrant: vi.fn().mockResolvedValue(false),
+    hasSystemSuperAdminRole: vi.fn().mockResolvedValue(false),
     listRolePermissionKeys: vi.fn().mockResolvedValue([]),
     listOverrideEffects: vi.fn().mockResolvedValue([]),
     ...overrides,
@@ -107,6 +108,39 @@ describe("permission precedence", () => {
     await expect(service.hasPermission(userId, "users:update")).resolves.toBe(
       false,
     );
+  });
+
+  it("never delegates credential management outside the system super-admin role", async () => {
+    const denied = createResolver({
+      getOverride: vi.fn().mockResolvedValue("ALLOW"),
+      hasRoleGrant: vi.fn().mockResolvedValue(true),
+      hasSystemSuperAdminRole: vi.fn().mockResolvedValue(false),
+    });
+    await expect(
+      denied.service.hasPermission(userId, "users:credentials:manage"),
+    ).resolves.toBe(false);
+    expect(denied.repository.getOverride).not.toHaveBeenCalled();
+
+    const allowed = createResolver({
+      hasSystemSuperAdminRole: vi.fn().mockResolvedValue(true),
+      hasRoleGrant: vi.fn().mockResolvedValue(true),
+    });
+    await expect(
+      allowed.service.hasPermission(userId, "users:credentials:manage"),
+    ).resolves.toBe(true);
+  });
+
+  it("omits delegated credential management from effective permissions", async () => {
+    const { service } = createResolver({
+      listOverrideEffects: vi.fn().mockResolvedValue([
+        { key: "users:credentials:manage", effect: "ALLOW" },
+        { key: "users:read", effect: "ALLOW" },
+      ]),
+      hasSystemSuperAdminRole: vi.fn().mockResolvedValue(false),
+    });
+    await expect(service.listEffectivePermissions(userId)).resolves.toEqual([
+      "users:read",
+    ]);
   });
 });
 

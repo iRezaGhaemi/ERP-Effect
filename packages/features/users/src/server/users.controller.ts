@@ -16,10 +16,10 @@ import {
 import { z } from "zod";
 
 import {
-  CreateUserSchema,
+  CreatePasswordUserSchema,
   UpdateUserSchema,
   UserPageQuerySchema,
-  type CreateUserInput,
+  type CreatePasswordUserInput,
   type UpdateUserInput,
   type UserPageQuery,
 } from "../contracts/index.js";
@@ -31,10 +31,13 @@ type PrincipalRequest = {
   headers: Record<string, string | string[] | undefined>;
 };
 const RequirePermission = (key: string): MethodDecorator =>
-  SetMetadata("effect:required-permission", key);
+  SetMetadata("effect:required-permission", [key]);
+const RequirePermissions = (...keys: string[]): MethodDecorator =>
+  SetMetadata("effect:required-permission", keys);
 function errorStatus(code: string): number {
   if (code === "USER_NOT_FOUND") return 404;
   if (code === "PHONE_ALREADY_EXISTS") return 409;
+  if (code === "USERNAME_ALREADY_EXISTS") return 409;
   return 422;
 }
 async function execute<T>(
@@ -85,9 +88,9 @@ export class UsersController {
     return execute(request, () => this.users.list(query));
   }
   @Post()
-  @RequirePermission("users:create")
+  @RequirePermissions("users:create", "users:credentials:manage")
   create(
-    @Body(new ZodValidationPipe(CreateUserSchema)) body: CreateUserInput,
+    @Body(new ZodValidationPipe(CreatePasswordUserSchema)) body: CreatePasswordUserInput,
     @Req() request: PrincipalRequest,
   ) {
     return execute(request, () => this.users.create(body, request.user.userId));

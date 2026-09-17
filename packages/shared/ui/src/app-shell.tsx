@@ -8,6 +8,7 @@ export type AppShellProps = {
 const navigation = [
   { href: "/dashboard", label: "داشبورد" },
   { href: "/settings/sessions", label: "تنظیمات و نشست‌ها" },
+  { href: "/change-password", label: "تغییر گذرواژه" },
 ];
 
 export function AppShell({ children, title }: AppShellProps) {

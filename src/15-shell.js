@@ -87,7 +87,7 @@ function userMenu(e){
     {t:'خروج از حساب',ic:'logout',danger:true,fn:'logout()'},
   ],'رضا قایمی — reza@effectstudio.ir');
 }
-function logout(){confirmDlg('خروج از حساب','آیا می‌خواهید از حساب کاربری خود خارج شوید؟',()=>{S.authed=false;location.hash='#/login';render();toast('info','خروج انجام شد','به امید دیدار مجدد');},'خروج',true);}
+function logout(){confirmDlg('خروج از حساب','آیا می‌خواهید از حساب کاربری خود خارج شوید؟',()=>{S.authed=false;authReset();location.hash='#/login';render();toast('info','خروج انجام شد','به امید دیدار مجدد');},'خروج',true);}
 function wsCreateModal(){
   openModal({title:'ایجاد فضای کاری جدید',body:
     fld('نام فضای کاری','<input class="inp" placeholder="مثلاً: تیم کیفیت">')+

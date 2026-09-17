@@ -18,7 +18,7 @@ const problems=[],ok=[];
     const artR=art?art.getBoundingClientRect():null;const sideR=side?side.getBoundingClientRect():null;
     return {cols,hasImg:!!img,imgCover:img?getComputedStyle(img).objectFit:'','imgLoaded':img?img.naturalWidth>0:false,
       rightIsArt:artR&&sideR?artR.right>sideR.right:null,artW:Math.round(artR?artR.width:0),sideW:Math.round(sideR?sideR.width:0),
-      hasPhone:!!document.getElementById('ph'),hasCard:!!document.querySelector('.auth-card')};
+      hasUsername:!!document.getElementById('auth-username'),hasPassword:!!document.getElementById('auth-password'),hasCard:!!document.querySelector('.auth-card')};
   });
   if(!auth)problems.push('no .auth-bg');
   else{
@@ -26,7 +26,7 @@ const problems=[],ok=[];
     if(!auth.rightIsArt)problems.push('image is NOT on the right');else ok.push('RIGHT=image ('+auth.artW+'px) / LEFT=form ('+auth.sideW+'px) ✓');
     if(auth.imgCover!=='cover')problems.push('object-fit='+auth.imgCover);else ok.push('object-fit:cover ✓');
     if(!auth.imgLoaded)problems.push('login image not loaded');else ok.push('login image loaded ✓');
-    if(!auth.hasPhone)problems.push('phone input missing');
+    if(!auth.hasUsername||!auth.hasPassword)problems.push('username/password inputs missing');
   }
   // mobile: art hidden
   const pg2=await b.newPage({viewport:{width:390,height:844}});
@@ -36,13 +36,11 @@ const problems=[],ok=[];
   await pg2.close();
 
   // ===== 2) auth flow works on new layout =====
-  await pg.fill('#ph','۰۹۱۲۱۲۳۴۵۶۷');
-  await pg.evaluate(()=>{authPhoneInput(document.getElementById('ph'));authSend();});
-  await pg.waitForTimeout(1500);
-  if(await pg.locator('.otp-box').count()<6)problems.push('otp boxes missing');else ok.push('phone→OTP flow ✓');
-  await pg.evaluate(()=>{$$('.otp-box').forEach((b,i)=>b.value='۱۲۳۴۵۶'.split('')[i]);authVerify();});
-  await pg.waitForTimeout(2600);
-  if(await pg.locator('.shell').count()<1)problems.push('shell missing after auth');else ok.push('OTP→app ✓');
+  await pg.fill('#auth-username','demo.admin');
+  await pg.fill('#auth-password','DemoOnly-123!');
+  await pg.click('#btn-auth');
+  await pg.waitForTimeout(300);
+  if(await pg.locator('.shell').count()<1)problems.push('shell missing after auth');else ok.push('username/password→app ✓');
 
   // ===== 3) سایدبار: دکمه expand در حالت جمع =====
   await pg.waitForTimeout(800);

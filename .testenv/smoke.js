@@ -14,16 +14,13 @@ function click(sel){const el=d.querySelector(sel);if(el){el.dispatchEvent(new w.
 const routes=['#/dashboard','#/mytasks','#/calendar','#/workspaces','#/tasks','#/crm','#/crm/pipeline','#/crm/companies','#/crm/contacts','#/crm/opps','#/crm/acts','#/customers','#/customers/c1','#/leaves','#/finance','#/finance/in','#/finance/pay','#/finance/exp','#/finance/invoices','#/finance/proforma','#/finance/payroll','#/finance/acc','#/finance/tx','#/finance/rpt','#/reports','#/social','#/social/posts','#/social/report','#/team','#/team/e2','#/integrations','#/permissions','#/activity','#/notifications','#/settings'];
 (async()=>{
   try{
-    // login → OTP → success
+    // demo username/password login → success
     if(!d.querySelector('.auth-card'))throw new Error('login card missing');
-    d.getElementById('ph').value='۰۹۱۲۱۲۳۴۵۶۷';
-    d.getElementById('ph').dispatchEvent(new w.Event('input',{bubbles:true}));
-    w.authSend();
-    await new Promise(r=>setTimeout(r,1200));
-    if(!d.querySelector('.otp-box'))throw new Error('otp step missing');
-    d.querySelectorAll('.otp-box').forEach((b,i)=>b.value='۱۲۳۴۵۶'.split('')[i]);
-    w.authVerify();
-    await new Promise(r=>setTimeout(r,2500));
+    d.getElementById('auth-username').value='demo.admin';
+    d.getElementById('auth-password').value='DemoOnly-123!';
+    d.getElementById('auth-username').dispatchEvent(new w.Event('input',{bubbles:true}));
+    d.getElementById('auth-password').dispatchEvent(new w.Event('input',{bubbles:true}));
+    w.authSubmit();
     if(!d.querySelector('.shell'))throw new Error('shell missing after auth');
     console.log('✓ auth flow OK — dashboard rendered, title:',d.getElementById('tb-title').textContent);
     for(const r of routes){

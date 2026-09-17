@@ -10,12 +10,12 @@ const principal: AuthenticatedPrincipal = {
   sessionId: "00000000-0000-4000-8000-000000000002",
   phone: "+989121234567",
   permissions: ["users:create"],
+  credentialVersion: 1,
+  mustChangePassword: false,
 };
 
 const tokenService = new TokenService({
-  pepper: "csrf-guard-test-otp-pepper-at-least-32-characters",
-  ttlSeconds: 120,
-  resendSeconds: 60,
+  rateLimitSecret: "csrf-guard-rate-limit-secret-at-least-32-characters",
   jwtAccessSecret: "csrf-guard-test-jwt-secret-at-least-32-characters",
   accessTtlSeconds: 900,
   refreshTtlDays: 30,

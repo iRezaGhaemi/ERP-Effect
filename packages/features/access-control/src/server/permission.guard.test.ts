@@ -9,7 +9,7 @@ import { PERMISSION_METADATA_KEY } from "./require-permission.decorator.js";
 describe("permission guard", () => {
   it("denies by default when a protected request has no authenticated principal", async () => {
     const reflector = {
-      getAllAndOverride: vi.fn().mockReturnValue("users:read"),
+      getAllAndOverride: vi.fn().mockReturnValue(["users:read"]),
     } as unknown as Reflector;
     const guard = new PermissionGuard(reflector, {
       hasPermission: vi.fn(),
@@ -33,7 +33,7 @@ describe("permission guard", () => {
     const userId = randomUUID();
     const hasPermission = vi.fn().mockResolvedValue(true);
     const guard = new PermissionGuard(
-      { getAllAndOverride: vi.fn().mockReturnValue("users:read") } as never,
+      { getAllAndOverride: vi.fn().mockReturnValue(["users:read"]) } as never,
       { hasPermission } as never,
     );
     const context = {

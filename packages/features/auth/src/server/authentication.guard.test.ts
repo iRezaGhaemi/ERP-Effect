@@ -4,13 +4,12 @@ import { describe, expect, it, vi } from "vitest";
 
 import { SessionEntity } from "../entities/index.js";
 import { AuthenticationGuard } from "./authentication.guard.js";
+import { ALLOW_PASSWORD_CHANGE_METADATA_KEY } from "./allow-password-change.decorator.js";
 import { PUBLIC_ROUTE_METADATA_KEY } from "./public.decorator.js";
 import { TokenService } from "./token.service.js";
 
 const options = {
-  pepper: "guard-otp-pepper-at-least-32-characters",
-  ttlSeconds: 120,
-  resendSeconds: 60,
+  rateLimitSecret: "guard-rate-limit-secret-at-least-32-characters",
   jwtAccessSecret: "guard-jwt-secret-at-least-32-characters",
   accessTtlSeconds: 900,
   refreshTtlDays: 30,
@@ -21,11 +20,15 @@ const user = {
   id: "6e444c58-63ee-4c74-b39d-f72a5eb84d3f",
   phone: "+989121234567",
   status: "ACTIVE",
+  credentialVersion: 3,
+  mustChangePassword: false,
 };
 const session = Object.assign(new SessionEntity(), {
   id: "7f29f0a6-ecae-4f46-afec-c6fe306502bd",
   userId: user.id,
   revokedAt: null,
+  expiresAt: new Date(Date.now() + 60_000),
+  credentialVersion: user.credentialVersion,
 });
 
 function executionContext(request: Record<string, unknown>): ExecutionContext {
@@ -40,16 +43,21 @@ function createGuard({
   activeSession = session,
   activeUser = user,
   isPublic = false,
+  allowPasswordChange = false,
 }: {
   activeSession?: SessionEntity | null;
   activeUser?: typeof user | null;
   isPublic?: boolean;
+  allowPasswordChange?: boolean;
 } = {}) {
   const tokens = new TokenService(options);
   const reflector = {
-    getAllAndOverride: vi.fn((key: string) =>
-      key === PUBLIC_ROUTE_METADATA_KEY && isPublic ? true : undefined,
-    ),
+    getAllAndOverride: vi.fn((key: string) => {
+      if (key === PUBLIC_ROUTE_METADATA_KEY && isPublic) return true;
+      if (key === ALLOW_PASSWORD_CHANGE_METADATA_KEY && allowPasswordChange)
+        return true;
+      return undefined;
+    }),
   } as unknown as Reflector;
   const sessionRepository = {
     findOneBy: vi.fn().mockResolvedValue(activeSession),
@@ -100,6 +108,8 @@ describe("AuthenticationGuard", () => {
       userId: user.id,
       sessionId: session.id,
       phone: user.phone,
+      credentialVersion: user.credentialVersion,
+      mustChangePassword: user.mustChangePassword,
     });
     const request = {
       headers: { cookie: `effect_access=${accessToken}` },
@@ -115,6 +125,8 @@ describe("AuthenticationGuard", () => {
         sessionId: session.id,
         phone: user.phone,
         permissions: ["audit:read", "sessions:revoke"],
+        credentialVersion: user.credentialVersion,
+        mustChangePassword: false,
       },
     });
     expect(access.listEffectivePermissions).toHaveBeenCalledWith(user.id);
@@ -126,6 +138,8 @@ describe("AuthenticationGuard", () => {
       userId: user.id,
       sessionId: session.id,
       phone: user.phone,
+      credentialVersion: user.credentialVersion,
+      mustChangePassword: user.mustChangePassword,
     });
 
     await expect(
@@ -148,6 +162,8 @@ describe("AuthenticationGuard", () => {
       userId: user.id,
       sessionId: session.id,
       phone: user.phone,
+      credentialVersion: user.credentialVersion,
+      mustChangePassword: user.mustChangePassword,
     });
 
     await expect(
@@ -183,6 +199,8 @@ describe("AuthenticationGuard", () => {
       userId: user.id,
       sessionId: session.id,
       phone: user.phone,
+      credentialVersion: user.credentialVersion,
+      mustChangePassword: user.mustChangePassword,
     });
 
     await expect(
@@ -194,5 +212,41 @@ describe("AuthenticationGuard", () => {
     ).rejects.toMatchObject({
       response: { error: { code: "SESSION_REVOKED" } },
     });
+  });
+
+  it("restricts temporary sessions to the explicit password-change allowlist", async () => {
+    const temporaryUser = { ...user, mustChangePassword: true };
+    const temporarySession = Object.assign(new SessionEntity(), session, {
+      credentialVersion: temporaryUser.credentialVersion,
+    });
+    const denied = createGuard({
+      activeSession: temporarySession,
+      activeUser: temporaryUser,
+    });
+    const token = denied.tokens.signAccessToken({
+      userId: temporaryUser.id,
+      sessionId: temporarySession.id,
+      phone: temporaryUser.phone,
+      credentialVersion: temporaryUser.credentialVersion,
+      mustChangePassword: true,
+    });
+    await expect(
+      denied.guard.canActivate(
+        executionContext({ headers: { cookie: `effect_access=${token}` } }),
+      ),
+    ).rejects.toMatchObject({
+      response: { error: { code: "PASSWORD_CHANGE_REQUIRED" } },
+    });
+
+    const allowed = createGuard({
+      activeSession: temporarySession,
+      activeUser: temporaryUser,
+      allowPasswordChange: true,
+    });
+    await expect(
+      allowed.guard.canActivate(
+        executionContext({ headers: { cookie: `effect_access=${token}` } }),
+      ),
+    ).resolves.toBe(true);
   });
 });

@@ -7,8 +7,10 @@ import { DataSource, type EntityManager } from "typeorm";
 
 import {
   CreateUserSchema,
+  CreatePasswordUserSchema,
   UpdateUserSchema,
   type CreateUserInput,
+  type CreatePasswordUserInput,
   type UpdateUserInput,
   type UserDetailDto,
   type UserDto,
@@ -16,6 +18,8 @@ import {
 } from "../contracts/index.js";
 import { UserEntity, UserStatus } from "../entities/index.js";
 import { normalizeIranianMobile } from "./phone.js";
+import { passwordHasher } from "./password-hasher.js";
+import { UserCredentialsService } from "./user-credentials.service.js";
 
 function isPostgresUniqueViolation(error: unknown): boolean {
   return (
@@ -37,6 +41,9 @@ function toUserDto(user: UserEntity): UserDto {
     firstName: user.firstName,
     lastName: user.lastName,
     status: user.status,
+    username: user.username,
+    credentialsReady: user.username !== null,
+    mustChangePassword: user.mustChangePassword,
     lastLoginAt: user.lastLoginAt?.toISOString() ?? null,
     createdAt: user.createdAt.toISOString(),
     updatedAt: user.updatedAt.toISOString(),
@@ -64,43 +71,46 @@ export class UsersService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly auditWriter: AuditWriter,
+    private readonly credentials: UserCredentialsService,
   ) {}
 
   async create(
-    input: CreateUserInput,
+    input: CreatePasswordUserInput,
     actorId: string,
     manager?: EntityManager,
   ): Promise<UserDto> {
-    const values = CreateUserSchema.parse(input);
+    const values = CreatePasswordUserSchema.parse(input);
+    const hash = await passwordHasher.hash(values.initialPassword);
     try {
       const work = async (transactionManager: EntityManager) => {
-        const repository = transactionManager.getRepository(UserEntity);
-        const user = await repository.save(
-          repository.create({
-            phone: normalizeIranianMobile(values.phone),
-            firstName: values.firstName,
-            lastName: values.lastName,
-            status: UserStatus.ACTIVE,
-          }),
-        );
-        await this.auditWriter.write(
-          {
-            actorId,
-            action: "users.created",
-            entityType: "users",
-            entityId: user.id,
-            metadata: {},
-            ipAddress: null,
-            requestId: requestId(),
-          },
+        const user = await this.createProfileEntity(
+          values,
+          actorId,
           transactionManager,
         );
-        return toUserDto(user);
+        const configured = await this.credentials.setTemporary(
+          user,
+          values.username,
+          hash,
+          transactionManager,
+        );
+        return toUserDto(configured);
       };
       return manager
         ? await work(manager)
         : await this.dataSource.transaction(work);
     } catch (error) {
+      if (isPostgresUniqueViolation(error))
+        if (
+          typeof error === "object" &&
+          error !== null &&
+          "constraint" in error &&
+          error.constraint === "uq_users_username"
+        )
+          throw new DomainError(
+            "USERNAME_ALREADY_EXISTS",
+            "نام کاربری قبلاً ثبت شده است.",
+          );
       if (isPostgresUniqueViolation(error))
         throw new DomainError(
           "PHONE_ALREADY_EXISTS",
@@ -108,6 +118,54 @@ export class UsersService {
         );
       throw error;
     }
+  }
+
+  async createProfile(
+    input: CreateUserInput,
+    actorId: string,
+    manager?: EntityManager,
+  ): Promise<UserDto> {
+    const values = CreateUserSchema.parse(input);
+    const work = async (transactionManager: EntityManager) =>
+      toUserDto(
+        await this.createProfileEntity(values, actorId, transactionManager),
+      );
+    return manager ? work(manager) : this.dataSource.transaction(work);
+  }
+
+  private async createProfileEntity(
+    values: CreateUserInput,
+    actorId: string,
+    manager: EntityManager,
+  ): Promise<UserEntity> {
+    const repository = manager.getRepository(UserEntity);
+    const user = await repository.save(
+      repository.create({
+        phone: normalizeIranianMobile(values.phone),
+        firstName: values.firstName,
+        lastName: values.lastName,
+        status: UserStatus.ACTIVE,
+        username: null,
+        passwordHash: null,
+        mustChangePassword: true,
+        temporaryPasswordExpiresAt: null,
+        passwordChangedAt: null,
+        credentialVersion: 0,
+      }),
+    );
+    await this.auditWriter.write(
+      {
+        actorId,
+        action: "users.created",
+        entityType: "users",
+        entityId: user.id,
+        metadata: {},
+        ipAddress: null,
+        requestId: requestId(),
+      },
+      manager,
+    );
+    return user;
   }
 
   async list(query: UserPageQuery): Promise<Page<UserDto>> {

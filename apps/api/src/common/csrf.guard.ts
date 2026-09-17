@@ -18,8 +18,7 @@ const mutatingMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const csrfExemptPaths = new Set([
   "/api/v1/health/live",
   "/api/v1/health/ready",
-  "/api/v1/auth/otp/request",
-  "/api/v1/auth/otp/verify",
+  "/api/v1/auth/login",
   "/api/v1/auth/refresh",
 ]);
 

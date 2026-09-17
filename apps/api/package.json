@@ -11,6 +11,7 @@
     "typecheck": "pnpm run build && tsc -p tsconfig.test-build.json --noEmit",
     "migrate": "node dist/migrate.js",
     "openapi:generate": "tsx src/openapi.ts",
+    "reset-admin": "node dist/reset-admin.js",
     "seed": "node dist/seed.js",
     "start": "node dist/main.js",
     "test": "pnpm run build && vitest run --config vitest.config.ts",

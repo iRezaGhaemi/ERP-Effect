@@ -14,7 +14,7 @@
     },
     "lint": { "dependsOn": ["^lint"], "outputs": [] },
     "typecheck": { "dependsOn": ["^build"], "outputs": [] },
-    "test": { "dependsOn": ["^build"], "outputs": ["coverage/**"] },
+    "test": { "dependsOn": ["^build"], "outputs": [] },
     "test:integration": {
       "dependsOn": ["^build"],
       "cache": false,

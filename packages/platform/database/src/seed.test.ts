@@ -160,7 +160,11 @@ function createSeedHarness(): { dataSource: DataSource; state: SeedState } {
 describe("initial access seed", () => {
   it("is idempotent and repairs exact catalog, system role, and grant drift with an audit event", async () => {
     const { dataSource, state } = createSeedHarness();
-    await seedInitialAccess(dataSource, "۰۹۱۲۱۲۳۴۵۶۷");
+    const credentials = {
+      username: "bootstrap.admin",
+      password: "Task5 bootstrap phrase 123!",
+    };
+    await seedInitialAccess(dataSource, "۰۹۱۲۱۲۳۴۵۶۷", credentials);
     await seedInitialAccess(dataSource, "09121234567");
     expect(state.audits).toHaveLength(1);
     expect(state.users).toHaveLength(1);
@@ -194,7 +198,7 @@ describe("initial access seed", () => {
       resource: corruptedPermission.key.split(":")[0],
       action: corruptedPermission.key.split(":")[1],
     });
-    expect(state.rolePermissions).toHaveLength(7);
+    expect(state.rolePermissions).toHaveLength(8);
     expect(
       state.rolePermissions.some(
         ({ permissionId }) => permissionId === unexpectedPermission.id,
@@ -210,7 +214,7 @@ describe("initial access seed", () => {
     ).not.toContain("+989121234567");
 
     await seedInitialAccess(dataSource, "09121234567");
-    expect(state.rolePermissions).toHaveLength(7);
+    expect(state.rolePermissions).toHaveLength(8);
     expect(state.audits).toHaveLength(2);
   });
 });

@@ -39,6 +39,10 @@ export interface AccessControlRepository {
     key: string,
     manager?: EntityManager,
   ): Promise<boolean>;
+  hasSystemSuperAdminRole(
+    userId: string,
+    manager?: EntityManager,
+  ): Promise<boolean>;
   listRolePermissionKeys(
     userId: string,
     manager?: EntityManager,
@@ -94,6 +98,25 @@ export class PostgresAccessControlRepository implements AccessControlRepository 
          WHERE user_role.user_id = $1 AND permission.key = $2
        ) AS present`,
       [userId, key],
+    );
+    return rows[0]?.present === true;
+  }
+
+  async hasSystemSuperAdminRole(
+    userId: string,
+    manager?: EntityManager,
+  ): Promise<boolean> {
+    const rows = await (manager ?? this.dataSource.manager).query<
+      Array<{ present: boolean }>
+    >(
+      `SELECT EXISTS (
+         SELECT 1 FROM user_roles user_role
+         INNER JOIN roles role ON role.id = user_role.role_id
+         WHERE user_role.user_id = $1
+           AND role.slug = 'super-admin'
+           AND role.is_system = true
+       ) AS present`,
+      [userId],
     );
     return rows[0]?.present === true;
   }
@@ -185,12 +208,21 @@ export class AccessControlService {
     private readonly auditWriter: AuditWriter,
   ) {}
 
-  async hasPermission(userId: string, key: string): Promise<boolean> {
-    if (!(await this.repository.isUserActive(userId))) return false;
-    const override = await this.repository.getOverride(userId, key);
+  async hasPermission(
+    userId: string,
+    key: string,
+    manager?: EntityManager,
+  ): Promise<boolean> {
+    if (!(await this.repository.isUserActive(userId, manager))) return false;
+    if (
+      key === "users:credentials:manage" &&
+      !(await this.repository.hasSystemSuperAdminRole(userId, manager))
+    )
+      return false;
+    const override = await this.repository.getOverride(userId, key, manager);
     if (override === PermissionEffect.DENY) return false;
     if (override === PermissionEffect.ALLOW) return true;
-    return this.repository.hasRoleGrant(userId, key);
+    return this.repository.hasRoleGrant(userId, key, manager);
   }
 
   async listEffectivePermissions(userId: string): Promise<string[]> {
@@ -203,6 +235,11 @@ export class AccessControlService {
         effective.delete(override.key);
       else effective.add(override.key);
     }
+    if (
+      effective.has("users:credentials:manage") &&
+      !(await this.repository.hasSystemSuperAdminRole(userId))
+    )
+      effective.delete("users:credentials:manage");
     return [...effective].sort();
   }
 

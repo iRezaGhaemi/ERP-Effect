@@ -12,7 +12,10 @@ export type SessionRevocationReason =
   | "ADMIN_REVOKED"
   | "REFRESH_REUSE"
   | "SESSION_EXPIRED"
-  | "USER_SUSPENDED";
+  | "USER_SUSPENDED"
+  | "AUTH_METHOD_CHANGED"
+  | "PASSWORD_CHANGED"
+  | "PASSWORD_RESET";
 
 @Entity({ name: "sessions" })
 @Index("ix_sessions_user_active", ["userId"], {
@@ -26,6 +29,9 @@ export class SessionEntity {
 
   @Column({ name: "user_id", type: "uuid" })
   userId!: string;
+
+  @Column({ name: "credential_version", type: "integer", default: 0 })
+  credentialVersion!: number;
 
   @Column({ name: "user_agent", type: "varchar", length: 512 })
   userAgent!: string;

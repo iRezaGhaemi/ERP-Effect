@@ -16,6 +16,7 @@ function createRepository(): AccessControlRepository {
     isUserActive: vi.fn(),
     getOverride: vi.fn(),
     hasRoleGrant: vi.fn(),
+    hasSystemSuperAdminRole: vi.fn(),
     listRolePermissionKeys: vi.fn(),
     listOverrideEffects: vi.fn(),
   };

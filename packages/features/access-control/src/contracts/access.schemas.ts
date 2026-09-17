@@ -4,6 +4,7 @@ import { z } from "zod";
 export const PermissionKeySchema = z.enum([
   "users:read",
   "users:create",
+  "users:credentials:manage",
   "users:update",
   "users:suspend",
   "roles:manage",

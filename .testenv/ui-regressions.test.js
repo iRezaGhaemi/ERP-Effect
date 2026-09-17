@@ -78,6 +78,46 @@ test('login branding exposes the current 2.6 version and primary color', t => {
   assert.doesNotMatch(favicon.toUpperCase(), /%235E01A4/);
 });
 
+test('demo login uses labeled username and password fields with no OTP step', t => {
+  const {document} = loadApp(t);
+  const card = document.querySelector('.auth-card');
+
+  assert.ok(document.querySelector('label[for="auth-username"]'));
+  assert.ok(document.querySelector('label[for="auth-password"]'));
+  assert.equal(document.getElementById('auth-username')?.getAttribute('autocomplete'), 'username');
+  assert.equal(document.getElementById('auth-password')?.getAttribute('autocomplete'), 'current-password');
+  assert.match(card.textContent, /نسخه نمایشی/);
+  assert.doesNotMatch(card.textContent, /پیامک|کد تایید|دو مرحله‌ای/);
+  assert.equal(document.querySelector('.otp-box'), null);
+});
+
+test('demo login rejects mismatches, accepts examples, and renders input as text', t => {
+  const {window, document, errors} = loadApp(t);
+  const username = document.getElementById('auth-username');
+  const password = document.getElementById('auth-password');
+  username.value = '<img id="auth-xss" src=x>';
+  password.value = 'not-the-demo-password';
+  username.dispatchEvent(new window.Event('input', {bubbles: true}));
+  password.dispatchEvent(new window.Event('input', {bubbles: true}));
+  window.authSubmit();
+
+  assert.equal(document.getElementById('auth-xss'), null);
+  assert.match(document.querySelector('.auth-card').textContent, /نام کاربری یا رمز عبور نمایشی نادرست است/);
+  assert.equal(window.S.authed, false);
+
+  document.getElementById('auth-username').value = 'demo.admin';
+  document.getElementById('auth-password').value = 'DemoOnly-123!';
+  document.getElementById('auth-username').dispatchEvent(new window.Event('input', {bubbles: true}));
+  document.getElementById('auth-password').dispatchEvent(new window.Event('input', {bubbles: true}));
+  window.authSubmit();
+
+  assert.equal(window.S.authed, true);
+  assert.ok(document.querySelector('.shell'));
+  assert.doesNotMatch(document.querySelector('.shell').textContent, /DemoOnly-123!/);
+  assert.doesNotMatch(JSON.stringify(window.S), /DemoOnly-123!/);
+  assert.deepEqual(errors, []);
+});
+
 test('the product has no messenger entry points while tasks remain usable', t => {
   const {window, document, errors} = loadApp(t);
   window.location.hash = '#/dashboard';

@@ -1,27 +1,6 @@
 import { createPageSchema } from "@effect-erp/contracts";
 import { z } from "zod";
 
-const persianDigits = "۰۱۲۳۴۵۶۷۸۹";
-const arabicDigits = "٠١٢٣٤٥٦٧٨٩";
-
-function toEnglishDigits(value: string): string {
-  return value.replace(/[۰-۹٠-٩]/g, (digit) => {
-    const persianIndex = persianDigits.indexOf(digit);
-    return persianIndex >= 0
-      ? String(persianIndex)
-      : String(arabicDigits.indexOf(digit));
-  });
-}
-
-function isIranianMobile(value: string): boolean {
-  const compact = toEnglishDigits(value).trim().replace(/[\s-]/g, "");
-  return /^(?:\+98|0098|98|0)9\d{9}$/.test(compact);
-}
-
-export const RequestOtpSchema = z.object({
-  phone: z.string().trim().refine(isIranianMobile, "شماره موبایل معتبر نیست."),
-});
-
 export const CSRF_TOKEN_BYTES = 32;
 export const CSRF_TOKEN_LENGTH = Math.ceil((CSRF_TOKEN_BYTES * 8) / 6);
 const csrfTokenPattern = new RegExp(`^[A-Za-z0-9_-]{${CSRF_TOKEN_LENGTH}}$`);
@@ -30,26 +9,15 @@ export const CsrfTokenSchema = z
   .length(CSRF_TOKEN_LENGTH)
   .regex(csrfTokenPattern);
 
-export const RequestOtpResponseSchema = z.object({
-  accepted: z.literal(true),
-  challengeId: z.uuid(),
-  retryAfterSeconds: z.number().int().positive(),
-});
-
-export const VerifyOtpSchema = z.object({
-  challengeId: z.uuid(),
-  code: z
-    .string()
-    .trim()
-    .regex(/^\d{6}$/, "کد تأیید معتبر نیست."),
-});
-
 export const AuthUserSummarySchema = z.object({
   id: z.uuid(),
   phone: z.string().min(1),
   firstName: z.string(),
   lastName: z.string(),
   status: z.enum(["ACTIVE", "SUSPENDED"]),
+  username: z.string().nullable(),
+  credentialsReady: z.boolean(),
+  mustChangePassword: z.boolean(),
   lastLoginAt: z.iso.datetime().nullable(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
@@ -81,9 +49,6 @@ export const MeResponseSchema = z.object({
   permissions: z.array(z.string()),
 });
 
-export type RequestOtpInput = z.input<typeof RequestOtpSchema>;
-export type RequestOtpResponse = z.infer<typeof RequestOtpResponseSchema>;
-export type VerifyOtpInput = z.input<typeof VerifyOtpSchema>;
 export type AuthUserSummary = z.infer<typeof AuthUserSummarySchema>;
 export type AuthSessionResponse = z.infer<typeof AuthSessionResponseSchema>;
 export type AuthSessionItem = z.infer<typeof AuthSessionItemSchema>;

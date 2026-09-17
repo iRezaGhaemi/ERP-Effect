@@ -19,7 +19,7 @@ const ck=(id,pass,detail)=>{(pass?R:F).push((pass?'✓ ':'✗ ')+id+(detail?' �
     return {cols:getComputedStyle(bg).gridTemplateColumns.split(' ').length,
       imgRight:aR&&sR?aR.right>sR.right:false,cover:img?getComputedStyle(img).objectFit:'',loaded:img?img.naturalWidth>0:false,
       fullbleed:aR?Math.abs(aR.height-innerHeight)<2&&Math.abs(aR.width-aR.width)<1:false,
-      card:!!document.querySelector('.auth-side .auth-card'),phone:!!document.getElementById('ph'),
+      card:!!document.querySelector('.auth-side .auth-card'),username:!!document.getElementById('auth-username'),password:!!document.getElementById('auth-password'),
       dir:document.documentElement.dir,lang:document.documentElement.lang,
       font:getComputedStyle(document.body).fontFamily,
       faces:[...document.fonts].filter(f=>f.family==='IRANSansX'&&f.status==='loaded').length,
@@ -27,15 +27,13 @@ const ck=(id,pass,detail)=>{(pass?R:F).push((pass?'✓ ':'✗ ')+id+(detail?' �
   });
   ck('8. login two columns',v.cols===2,v.cols+' columns');
   ck('9. RIGHT = full-bleed image',v.imgRight&&v.cover==='cover'&&v.loaded&&v.fullbleed,'object-fit:cover, loaded, full height');
-  ck('10. LEFT = login box (logo/phone)',v.card&&v.phone,'auth-card centered + phone input');
+  ck('10. LEFT = login box (logo/credentials)',v.card&&v.username&&v.password,'auth-card centered + username/password inputs');
 
   /* فلو ورود */
-  await pg.fill('#ph','۰۹۱۲۱۲۳۴۵۶۷');
-  await pg.evaluate(()=>{authSend();});
-  await pg.waitForTimeout(1400);
-  const otp=await pg.locator('.otp-box').count();
-  await pg.evaluate(()=>{$$('.otp-box').forEach((b,i)=>b.value='۱۲۳۴۵۶'.split('')[i]);authVerify();});
-  await pg.waitForTimeout(2500);
+  await pg.fill('#auth-username','demo.admin');
+  await pg.fill('#auth-password','DemoOnly-123!');
+  await pg.click('#btn-auth');
+  await pg.waitForTimeout(300);
   const shell=await pg.locator('.shell').count();
 
   /* ===== داخل اپ ===== */
@@ -66,7 +64,7 @@ const ck=(id,pass,detail)=>{(pass?R:F).push((pass?'✓ ':'✗ ')+id+(detail?' �
   ck('14. profile photos',v.photos>5,v.photos+' photo avatars');
   ck('17. Persian RTL',v.dir==='rtl'&&v.lang==='fa',v.dir+'/'+v.lang);
   ck('18. Solar Hijri',v.date1405,'۱۴۰۵ in header');
-  ck('login→OTP→app flow',otp===6&&shell===1,'6 boxes → shell');
+  ck('username/password→app flow',shell===1,'demo credentials → shell');
 
   /* ===== سایدبار ===== */
   await pg.evaluate(()=>{if(!S.sbMini)toggleSb();});

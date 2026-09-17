@@ -6,6 +6,11 @@ jobs:
   acceptance:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      TASK5_COMPOSE_PROJECT_NAME: effect-task5-ci-${{ github.run_id }}-${{ github.run_attempt }}
+      TASK5_COMPOSE_FILE: compose.test.yml
+      E2E_ADMIN_USERNAME: test.admin
+      E2E_ADMIN_PASSWORD: Isolated test bootstrap phrase 123!
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -22,7 +27,9 @@ jobs:
       - run: npm ci --prefix .testenv
       - run: pnpm --filter @effect/web exec playwright install --with-deps chromium
       - run: docker info
-      - run: docker compose -f compose.test.yml up -d --build --wait
+      - run: docker compose -p "$TASK5_COMPOSE_PROJECT_NAME" -f "$TASK5_COMPOSE_FILE" config
+      - run: docker compose -p "$TASK5_COMPOSE_PROJECT_NAME" -f "$TASK5_COMPOSE_FILE" up -d --build --wait --wait-timeout 240
+      - run: node --test tooling/smoke/compose-healthchecks.test.mjs
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
@@ -40,4 +47,4 @@ jobs:
           path: apps/web/test-results/**/trace.zip
           if-no-files-found: ignore
       - if: always()
-        run: docker compose -f compose.test.yml down -v
+        run: docker compose -p "$TASK5_COMPOSE_PROJECT_NAME" -f "$TASK5_COMPOSE_FILE" down -v

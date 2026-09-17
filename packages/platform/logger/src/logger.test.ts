@@ -35,16 +35,36 @@ describe('createAppLogger', () => {
       {
         auth: { accessToken: 'nested-access-token' },
         delivery: { otp: '654321', code: 'nested-code' },
-        audit: [{ payload: { session: { refreshToken: 'deep-refresh-token' } } }],
+        credentials: {
+          password: 'nested-password',
+          currentPassword: 'nested-current-password',
+          newPassword: 'nested-new-password',
+          initialPassword: 'nested-initial-password',
+          label: 'safe-credential-label',
+        },
+        audit: [
+          {
+            payload: {
+              session: { refreshToken: 'deep-refresh-token' },
+              passwordHash: 'array-password-hash',
+            },
+          },
+        ],
       },
       'sending one-time password',
     );
 
     expect(output).toContain('[Redacted]');
+    expect(output).toContain('safe-credential-label');
     expect(output).not.toContain('nested-access-token');
     expect(output).not.toContain('654321');
     expect(output).not.toContain('nested-code');
     expect(output).not.toContain('deep-refresh-token');
+    expect(output).not.toContain('nested-password');
+    expect(output).not.toContain('nested-current-password');
+    expect(output).not.toContain('nested-new-password');
+    expect(output).not.toContain('nested-initial-password');
+    expect(output).not.toContain('array-password-hash');
   });
 
   it('handles circular payloads without corrupting non-plain values', () => {
@@ -73,6 +93,8 @@ describe('createAppLogger', () => {
       readonly label = 'delivery';
       readonly accessToken = 'instance-access-token';
       readonly otp = 'instance-otp';
+      readonly actorPassword = 'instance-actor-password';
+      readonly passwordHash = 'instance-password-hash';
     }
 
     let output = '';
@@ -89,6 +111,13 @@ describe('createAppLogger', () => {
       SMS_HTTP_TOKEN: 'error-sms-token',
       OTP_PEPPER: 'error-otp-pepper',
       JWT_ACCESS_SECRET: 'error-jwt-secret',
+      password: 'error-password',
+      currentPassword: 'error-current-password',
+      newPassword: 'error-new-password',
+      initialPassword: 'error-initial-password',
+      INITIAL_ADMIN_PASSWORD: 'error-bootstrap-password',
+      AUTH_RATE_LIMIT_SECRET: 'error-rate-limit-secret',
+      safeContext: 'safe-error-context',
     });
 
     logger.info({ delivery: new DeliveryMetadata(), err: error }, 'request failed');
@@ -96,14 +125,23 @@ describe('createAppLogger', () => {
     expect(output).toContain('[Redacted]');
     expect(output).toContain('delivery');
     expect(output).toContain('database unavailable');
+    expect(output).toContain('safe-error-context');
     for (const secret of [
       'instance-access-token',
       'instance-otp',
+      'instance-actor-password',
+      'instance-password-hash',
       'error-refresh-token',
       'error-code',
       'error-sms-token',
       'error-otp-pepper',
       'error-jwt-secret',
+      'error-password',
+      'error-current-password',
+      'error-new-password',
+      'error-initial-password',
+      'error-bootstrap-password',
+      'error-rate-limit-secret',
     ]) {
       expect(output).not.toContain(secret);
     }

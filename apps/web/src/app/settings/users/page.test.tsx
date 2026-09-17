@@ -15,6 +15,9 @@ const user = {
   firstName: "سارا",
   lastName: "رضایی",
   status: "ACTIVE",
+  username: "sara.rezaei",
+  credentialsReady: true,
+  mustChangePassword: false,
   lastLoginAt: null,
   createdAt: "2026-08-28T10:00:00.000Z",
   updatedAt: "2026-08-28T10:00:00.000Z",
@@ -46,6 +49,38 @@ describe("UsersPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "تعلیق کاربر" }));
 
     expect((await screen.findByRole("alert")).textContent).toContain("آخرین مدیر ارشد فعال قابل تعلیق نیست.");
+  });
+
+  it("does not offer user creation when credential-management permission is absent", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request) => {
+      const url = input instanceof Request ? input.url : String(input);
+      if (url.endsWith("/api/v1/me")) return response({ user, permissions: ["users:read", "users:create"] });
+      if (url.includes("/api/v1/users?")) return response({ items: [], meta: { page: 1, pageSize: 20, total: 0, pageCount: 0 } });
+      throw new Error(`Unexpected fetch: ${url}`);
+    }));
+
+    render(<UsersPage />);
+
+    await screen.findByText("کاربری برای نمایش وجود ندارد.");
+    expect(screen.queryByRole("button", { name: "کاربر جدید" })).toBeNull();
+  });
+
+  it("shows credential reset only with credential-management permission and keeps username non-secret", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request) => {
+      const url = input instanceof Request ? input.url : String(input);
+      if (url.endsWith("/api/v1/me")) return response({ user, permissions: ["users:read", "users:credentials:manage"] });
+      if (url.includes("/api/v1/users?")) return response({ items: [user], meta: { page: 1, pageSize: 20, total: 1, pageCount: 1 } });
+      if (url.endsWith(`/api/v1/users/${user.id}`)) return response({ ...user, roleIds: [], permissionOverrides: [] });
+      throw new Error(`Unexpected fetch: ${url}`);
+    }));
+
+    render(<UsersPage />);
+    fireEvent.click(await screen.findByRole("button", { name: "جزئیات سارا رضایی" }));
+
+    expect(await screen.findByRole("heading", { name: "بازنشانی گذرواژه" })).toBeTruthy();
+    expect(screen.getAllByText("sara.rezaei").length).toBeGreaterThan(0);
+    expect(document.body.textContent).not.toContain("initialPassword");
+    expect(document.body.textContent).not.toContain("actorPassword");
   });
 });
 

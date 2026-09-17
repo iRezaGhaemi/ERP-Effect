@@ -3,17 +3,21 @@ import {
   AuthSessionListQuerySchema,
   AuthSessionPageSchema,
   AuthSessionResponseSchema,
+  LoginSchema,
   MeResponseSchema,
-  RequestOtpResponseSchema,
-  RequestOtpSchema,
-  VerifyOtpSchema,
   type AuthSessionListQuery,
   type AuthSessionResponse,
+  type LoginInput,
   type MeResponse,
-  type RequestOtpInput,
-  type RequestOtpResponse,
-  type VerifyOtpInput,
 } from "../contracts/index.js";
+import {
+  ChangePasswordSchema,
+  ResetPasswordSchema,
+  SetupCredentialsSchema,
+  type ChangePasswordInput,
+  type ResetPasswordInput,
+  type SetupCredentialsInput,
+} from "@effect/users/contracts";
 import { z } from "zod";
 
 function csrfToken(): string | undefined {
@@ -69,17 +73,36 @@ export class AuthClient {
     return schema.parse(body);
   }
 
-  requestOtp(input: RequestOtpInput): Promise<RequestOtpResponse> {
-    return this.request("/auth/otp/request", RequestOtpResponseSchema, {
+  login(input: LoginInput): Promise<AuthSessionResponse> {
+    return this.request("/auth/login", AuthSessionResponseSchema, {
       method: "POST",
-      body: RequestOtpSchema.parse(input),
+      body: LoginSchema.parse(input),
     });
   }
 
-  verifyOtp(input: VerifyOtpInput): Promise<AuthSessionResponse> {
-    return this.request("/auth/otp/verify", AuthSessionResponseSchema, {
+  changePassword(input: ChangePasswordInput): Promise<AuthSessionResponse> {
+    return this.request("/auth/password/change", AuthSessionResponseSchema, {
       method: "POST",
-      body: VerifyOtpSchema.parse(input),
+      body: ChangePasswordSchema.parse(input),
+      csrf: true,
+    });
+  }
+
+  setupCredentials(id: string, input: SetupCredentialsInput): Promise<void> {
+    const userId = UuidIdParamsSchema.parse({ id }).id;
+    return this.request(`/users/${userId}/credentials`, z.undefined(), {
+      method: "POST",
+      body: SetupCredentialsSchema.parse(input),
+      csrf: true,
+    });
+  }
+
+  resetPassword(id: string, input: ResetPasswordInput): Promise<void> {
+    const userId = UuidIdParamsSchema.parse({ id }).id;
+    return this.request(`/users/${userId}/password/reset`, z.undefined(), {
+      method: "POST",
+      body: ResetPasswordSchema.parse(input),
+      csrf: true,
     });
   }
 

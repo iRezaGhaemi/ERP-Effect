@@ -6,7 +6,10 @@ import { DataSource } from "typeorm";
 
 import { AUTH_OPTIONS, type AuthOptions } from "./auth.options.js";
 
-export type RateLimitScope = "otp:phone" | "otp:ip" | "otp:resend";
+export type RateLimitScope =
+  | "auth:username"
+  | "auth:ip"
+  | "auth:actor";
 export type RateLimitPolicy = { limit: number; windowSeconds: number };
 
 type RateLimitResult = {
@@ -28,7 +31,8 @@ export class RateLimitService {
     private readonly dataSource: DataSource,
     @Inject(AUTH_OPTIONS) options: AuthOptions | string,
   ) {
-    this.pepper = typeof options === "string" ? options : options.pepper;
+    this.pepper =
+      typeof options === "string" ? options : options.rateLimitSecret;
   }
 
   async consume(

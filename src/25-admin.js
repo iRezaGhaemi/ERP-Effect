@@ -264,8 +264,8 @@ function setTheme(){
 }
 function setSecurity(){
   return `<div class="card" style="max-width:720px"><div class="card-b col g16">
-   <div class="panel" style="padding:16px 16px"><div class="row"><div class="grow"><b class="t-bs" style="color:var(--t1)">ورود دو مرحله‌ای با پیامک</b><p class="t-cap">روش احراز هویت اجباری همه کاربران</p></div><span class="badge bd-ok">فعال — اجباری</span></div></div>
-   <div class="frow">${fld('طول عمر کد تایید (دقیقه)','<input class="inp num" value="۲">')}${fld('حداکثر تلاش ورود','<input class="inp num" value="۳">')}</div>
+   <div class="panel" style="padding:16px 16px"><div class="row"><div class="grow"><b class="t-bs" style="color:var(--t1)">ورود با نام کاربری و رمز عبور</b><p class="t-cap">روش احراز هویت همه کاربران</p></div><span class="badge bd-ok">فعال — اجباری</span></div></div>
+   <div class="frow">${fld('حداقل طول رمز عبور','<input class="inp num" value="۱۵" readonly>')}${fld('حداکثر تلاش ورود','<input class="inp num" value="۵">')}</div>
    <h4 class="t-h4">نشست‌های فعال</h4>
    ${[['iPhone 15 — تهران','Chrome · همین حالا',1],['MacBook Pro — تهران','Chrome · ۲ ساعت پیش',0],['Windows — مشهد','Edge · ۳ روز پیش',0]].map(s=>`
     <div class="row" style="justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--bd)">

@@ -39,12 +39,13 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .effect-login-brand h1 { margin: 0; font-size: 22px; font-weight: 700; }
 .effect-brand__mark { display: inline-grid; width: 52px; height: 52px; place-items: center; border-radius: 12px; background: var(--effect-primary); color: white; font-weight: 700; }
 .effect-login-copy { margin: -8px 0 8px; color: var(--effect-text-muted); font-size: 14px; line-height: 1.8; text-align: center; }
-.effect-otp-row { display: flex; justify-content: center; gap: 8px; }
-.effect-otp-input { width: 46px; height: 54px; border: 1px solid var(--effect-border); border-radius: var(--effect-radius); background: var(--effect-subtle); color: var(--effect-text); font-size: 22px; font-weight: 500; text-align: center; }
-.effect-otp-input:focus { border-color: var(--effect-primary); outline: 0; }.effect-otp-input:disabled { opacity: .6; }
 .effect-form-error { margin: -4px 0 0; color: var(--effect-danger); font-size: 13px; text-align: center; }
-.effect-login-actions { display: flex; align-items: center; justify-content: space-between; gap: var(--effect-space-2); font-size: 12px; }
-.effect-link-button { border: 0; background: transparent; color: var(--effect-primary-dark); cursor: pointer; padding: 4px; }.effect-link-button:disabled { color: var(--effect-text-muted); cursor: wait; }.effect-countdown { color: var(--effect-text-muted); font-variant-numeric: tabular-nums; }
+.effect-password-field { position: relative; }
+.effect-password-field .effect-field__input { padding-inline-end: 76px; text-align: left; }
+.effect-password-toggle { position: absolute; inset-inline-end: 8px; top: 31px; min-height: 34px; border: 0; border-radius: 7px; background: transparent; color: var(--effect-primary-dark); padding: 0 8px; cursor: pointer; font-size: 12px; font-weight: 600; }
+.effect-password-toggle:hover { background: var(--effect-primary-soft); }.effect-password-toggle:disabled { cursor: wait; color: var(--effect-text-muted); }
+.effect-credential-notice { display: grid; gap: 4px; margin: -2px 0 4px; border-inline-start: 4px solid var(--effect-primary); border-radius: var(--effect-radius); background: var(--effect-primary-soft); color: var(--effect-primary-dark); padding: 12px 14px; font-size: 13px; line-height: 1.7; }
+.effect-credential-notice strong { font-size: 14px; }.effect-credential-notice span { color: var(--effect-text); }
 
 .effect-shell { display: flex; min-height: 100vh; overflow-x: clip; background: var(--effect-page); }
 .effect-sidebar { display: flex; width: 252px; flex: none; flex-direction: column; gap: 32px; padding: 20px 12px; border-left: 1px solid var(--effect-border); background: var(--effect-surface); }
@@ -62,5 +63,7 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .effect-access-section { display: grid; gap: 12px; padding: 20px 0; border-top: 1px solid var(--effect-border); }.effect-access-section h3 { margin: 0; }.effect-override-list { border: 1px solid var(--effect-border); border-radius: var(--effect-radius); }.effect-override-list li > div { display: flex; flex-wrap: wrap; gap: 8px; }.effect-override-list .effect-button { min-height: 36px; padding: 0 10px; font-size: 12px; }.effect-note { color: var(--effect-text-muted); font-size: 12px; }.effect-check { display: flex; align-items: center; gap: 8px; color: var(--effect-text); font-size: 13px; }.effect-check input { inline-size: 16px; block-size: 16px; accent-color: var(--effect-primary); }.effect-audit-metadata { max-width: 280px; margin: 0; overflow: auto; color: var(--effect-text-muted); font: 11px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; direction: ltr; text-align: left; }.effect-sr-only { position: absolute; overflow: hidden; width: 1px; height: 1px; clip: rect(0, 0, 0, 0); white-space: nowrap; }
 .effect-drawer-backdrop { position: fixed; z-index: 20; inset: 0; display: flex; justify-content: flex-start; background: rgb(36 36 43 / 28%); }.effect-drawer { width: min(100%, 500px); min-height: 100%; overflow-y: auto; padding: 24px; background: var(--effect-surface); }.effect-drawer > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--effect-border); padding-bottom: 12px; }.effect-drawer h2 { margin: 0; font-size: 18px; }.effect-drawer-profile { margin: 20px 0 -4px; }.effect-profile { display: grid; grid-template-columns: max-content 1fr; gap: 8px 20px; margin: 20px 0; }.effect-profile dt { color: var(--effect-text-muted); }.effect-profile dd { margin: 0; }
 .effect-table-wrap { contain: layout paint; }
+.effect-user-username { display: block; margin-top: 4px; color: var(--effect-text-muted); font-size: 11px; text-align: right; }
+.effect-credential-form { padding-block: 4px 0; }
 @media (max-width: 560px) { .effect-admin-card__header, .effect-pagination, .effect-role-list li, .effect-override-list li { align-items: stretch; flex-direction: column; }.effect-override-list li > div { width: 100%; }.effect-override-list .effect-button { flex: 1; }.effect-drawer { width: 100%; }.effect-table th, .effect-table td { padding: 12px 16px; } }
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; transition-duration: 0.01ms !important; } }

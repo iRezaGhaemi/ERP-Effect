@@ -11,8 +11,13 @@ import { CreateAuditLogs202608280002 } from "../../../../platform/database/src/m
 import { ReconcileAuditLogsActorNull202608280003 } from "../../../../platform/database/src/migrations/202608280003-reconcile-audit-logs-actor-null.js";
 import { HardenAuditLogBoundary202608280004 } from "../../../../platform/database/src/migrations/202608280004-harden-audit-log-boundary.js";
 import { CreateAccessControl202608280005 } from "../../../../platform/database/src/migrations/202608280005-create-access-control.js";
+import { AddPasswordCredentials202609010010 } from "../../../../platform/database/src/migrations/202609010010-add-password-credentials.js";
 
 const sources: DataSource[] = [];
+const bootstrapCredentials = {
+  username: "access.integration.admin",
+  password: "Access integration bootstrap phrase 123!",
+};
 afterEach(async () => {
   await Promise.all(sources.splice(0).filter((source) => source.isInitialized).map((source) => source.destroy()));
 });
@@ -35,6 +40,7 @@ describe("access control persistence", () => {
           ReconcileAuditLogsActorNull202608280003,
           HardenAuditLogBoundary202608280004,
           CreateAccessControl202608280005,
+          AddPasswordCredentials202609010010,
         ],
         synchronize: false,
       });
@@ -63,7 +69,11 @@ describe("access control persistence", () => {
       });
       sources.push(runtime);
       await runtime.initialize();
-      await seedInitialAccess(runtime, "۰۹۱۲۱۲۳۴۵۶۷");
+      await seedInitialAccess(
+        runtime,
+        "۰۹۱۲۱۲۳۴۵۶۷",
+        bootstrapCredentials,
+      );
       await seedInitialAccess(runtime, "09121234567");
       await runtime.query(
         `UPDATE permissions SET resource = 'wrong', action = 'wrong' WHERE key = 'users:read'`,
@@ -102,7 +112,7 @@ describe("access control persistence", () => {
         permissions.count,
         users.count,
         grants.count,
-      ]).toEqual([1, 7, 1, 7]);
+      ]).toEqual([1, 8, 1, 8]);
       const [
         [repairedPermission],
         [repairedRole],

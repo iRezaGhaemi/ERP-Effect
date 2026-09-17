@@ -14,7 +14,6 @@ describe("access-control migration 005", () => {
     const migration = new CreateAccessControl202608280005();
     await migration.up(runner);
     const sql = queries.join("\n");
-    expect(migration.name).toBe("CreateAccessControl202608280005");
     expect(sql).toContain('"uq_roles_slug"');
     expect(sql).toContain('"uq_permissions_key"');
     expect(sql).toContain(

@@ -15,6 +15,8 @@ const AccessTokenPayloadSchema = z.object({
   sub: z.uuid(),
   sid: z.uuid(),
   phone: z.string().min(1),
+  cv: z.number().int().nonnegative(),
+  mcp: z.boolean(),
   iat: z.number().int().nonnegative(),
   exp: z.number().int().positive(),
 });
@@ -25,6 +27,8 @@ type SignAccessTokenInput = {
   userId: string;
   sessionId: string;
   phone: string;
+  credentialVersion: number;
+  mustChangePassword: boolean;
 };
 
 function base64UrlJson(value: unknown): string {
@@ -51,6 +55,8 @@ export class TokenService {
       sub: input.userId,
       sid: input.sessionId,
       phone: input.phone,
+      cv: input.credentialVersion,
+      mcp: input.mustChangePassword,
       iat,
       exp: iat + this.options.accessTtlSeconds,
     });

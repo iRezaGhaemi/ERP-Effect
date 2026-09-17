@@ -1,7 +1,5 @@
 import { z } from "zod";
 
-const smsHttpProviderTimeoutSeconds = 5;
-
 const RawEnvSchema = z
   .object({
     NODE_ENV: z
@@ -11,67 +9,12 @@ const RawEnvSchema = z
     DATABASE_URL: z.url(),
     WEB_ORIGIN: z.url(),
     INTERNAL_API_URL: z.url(),
-    OTP_PEPPER: z.string().min(32),
+    AUTH_RATE_LIMIT_SECRET: z.string().min(32),
     JWT_ACCESS_SECRET: z.string().min(32),
-    SMS_PROVIDER: z.enum(["console", "fake", "http"]).default("console"),
-    SMS_HTTP_URL: z.preprocess(
-      (value) => (value === "" ? undefined : value),
-      z.url().optional(),
-    ),
-    SMS_HTTP_TOKEN: z.preprocess(
-      (value) => (value === "" ? undefined : value),
-      z.string().min(1).optional(),
-    ),
-    INITIAL_ADMIN_PHONE: z.string().min(1),
     COOKIE_SECURE: z.enum(["true", "false"]).optional(),
-    OTP_TTL_SECONDS: z.coerce.number().int().positive().default(120),
-    OTP_RESEND_SECONDS: z.coerce.number().int().positive().default(60),
-    OTP_DELIVERY_ACTIVATION_MARGIN_SECONDS: z.coerce
-      .number()
-      .int()
-      .min(1)
-      .max(30)
-      .optional(),
     REFRESH_TTL_DAYS: z.coerce.number().int().positive().default(30),
   })
   .superRefine((env, context) => {
-    if (env.NODE_ENV === "production" && env.SMS_PROVIDER !== "http") {
-      context.addIssue({
-        code: "custom",
-        message: "SMS_PROVIDER must be http in production.",
-        path: ["SMS_PROVIDER"],
-      });
-    }
-
-    if (
-      env.NODE_ENV === "production" &&
-      env.OTP_DELIVERY_ACTIVATION_MARGIN_SECONDS === undefined
-    ) {
-      context.addIssue({
-        code: "custom",
-        message:
-          "OTP_DELIVERY_ACTIVATION_MARGIN_SECONDS is required in production.",
-        path: ["OTP_DELIVERY_ACTIVATION_MARGIN_SECONDS"],
-      });
-    }
-
-    if (env.NODE_ENV === "production") {
-      const activationMargin = env.OTP_DELIVERY_ACTIVATION_MARGIN_SECONDS ?? 0;
-      const minimumSafeTtlSeconds = Math.max(
-        30,
-        smsHttpProviderTimeoutSeconds + activationMargin + 1,
-      );
-
-      if (env.OTP_TTL_SECONDS < minimumSafeTtlSeconds) {
-        context.addIssue({
-          code: "custom",
-          message:
-            "OTP_TTL_SECONDS must be at least 30 and greater than the SMS HTTP provider timeout plus OTP_DELIVERY_ACTIVATION_MARGIN_SECONDS in production.",
-          path: ["OTP_TTL_SECONDS"],
-        });
-      }
-    }
-
     if (env.NODE_ENV !== "development" && env.COOKIE_SECURE === "false") {
       context.addIssue({
         code: "custom",
@@ -79,28 +22,10 @@ const RawEnvSchema = z
         path: ["COOKIE_SECURE"],
       });
     }
-
-    if (env.SMS_PROVIDER === "http" && !env.SMS_HTTP_URL) {
-      context.addIssue({
-        code: "custom",
-        message: "SMS_HTTP_URL is required when SMS_PROVIDER is http.",
-        path: ["SMS_HTTP_URL"],
-      });
-    }
-
-    if (env.SMS_PROVIDER === "http" && !env.SMS_HTTP_TOKEN) {
-      context.addIssue({
-        code: "custom",
-        message: "SMS_HTTP_TOKEN is required when SMS_PROVIDER is http.",
-        path: ["SMS_HTTP_TOKEN"],
-      });
-    }
   });
 
 export const AppEnvSchema = RawEnvSchema.transform((env) => ({
   ...env,
-  OTP_DELIVERY_ACTIVATION_MARGIN_SECONDS:
-    env.OTP_DELIVERY_ACTIVATION_MARGIN_SECONDS ?? 5,
   COOKIE_SECURE: env.COOKIE_SECURE
     ? env.COOKIE_SECURE === "true"
     : env.NODE_ENV !== "development",

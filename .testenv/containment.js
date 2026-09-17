@@ -61,4 +61,5 @@ const {browserLaunchOptions}=require('./browser');
   await b.close();
   if(problems.length){console.log('✗ CONTAINMENT ('+problems.length+'):');problems.slice(0,30).forEach(p=>console.log('  '+p));process.exit(1);}
   console.log('✅ containment passed — 4 viewports × 45 routes (incl. v2.3 hubs) + 8 overlays, nothing escapes its box');
+  process.exit(0);
 })().catch(e=>{console.log('ERR',e.message);process.exit(1)});

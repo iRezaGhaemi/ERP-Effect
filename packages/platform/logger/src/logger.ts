@@ -11,6 +11,14 @@ const redactedPaths = [
   'SMS_HTTP_TOKEN',
   'OTP_PEPPER',
   'JWT_ACCESS_SECRET',
+  'password',
+  'currentPassword',
+  'newPassword',
+  'initialPassword',
+  'actorPassword',
+  'passwordHash',
+  'INITIAL_ADMIN_PASSWORD',
+  'AUTH_RATE_LIMIT_SECRET',
 ] as const;
 
 const sensitiveKeys = new Set([
@@ -23,6 +31,14 @@ const sensitiveKeys = new Set([
   'SMS_HTTP_TOKEN',
   'OTP_PEPPER',
   'JWT_ACCESS_SECRET',
+  'password',
+  'currentPassword',
+  'newPassword',
+  'initialPassword',
+  'actorPassword',
+  'passwordHash',
+  'INITIAL_ADMIN_PASSWORD',
+  'AUTH_RATE_LIMIT_SECRET',
 ]);
 
 function isPlainObject(value: object): value is Record<string, unknown> {

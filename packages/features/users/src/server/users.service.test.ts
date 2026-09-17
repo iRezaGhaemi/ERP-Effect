@@ -65,16 +65,21 @@ describe("users service", () => {
           work(manager),
       } as never,
       { write: vi.fn() } as never,
+      {
+        setTemporary: vi.fn(async (user: UserEntity, username: string) =>
+          Object.assign(user, { username, mustChangePassword: true, credentialVersion: 1 }),
+        ),
+      } as never,
     );
 
     await service.create(
-      { phone: "09121234567", firstName: "رضا", lastName: "قایمی" },
+      { phone: "09121234567", firstName: "رضا", lastName: "قایمی", username: "reza", initialPassword: "Strong-password-123!" },
       actorId,
     );
 
     await expect(
       service.create(
-        { phone: "+989121234567", firstName: "رضا", lastName: "دوم" },
+        { phone: "+989121234567", firstName: "رضا", lastName: "دوم", username: "reza2", initialPassword: "Strong-password-456!" },
         actorId,
       ),
     ).rejects.toMatchObject({ code: "PHONE_ALREADY_EXISTS" });
@@ -88,10 +93,15 @@ describe("users service", () => {
           work(manager),
       } as never,
       { write: vi.fn() } as never,
+      {
+        setTemporary: vi.fn(async (user: UserEntity, username: string) =>
+          Object.assign(user, { username, mustChangePassword: true, credentialVersion: 1 }),
+        ),
+      } as never,
     );
     const facade = new UsersFacade({ manager } as never);
     await service.create(
-      { phone: "09121234567", firstName: "رضا", lastName: "قایمی" },
+      { phone: "09121234567", firstName: "رضا", lastName: "قایمی", username: "reza", initialPassword: "Strong-password-123!" },
       actorId,
       manager,
     );
@@ -110,6 +120,8 @@ describe("users service", () => {
       firstName: "رضا",
       lastName: "قایمی",
       status: UserStatus.ACTIVE,
+      username: "reza",
+      mustChangePassword: false,
       lastLoginAt: new Date("2026-08-28T01:00:00.000Z"),
       createdAt: new Date("2026-08-28T00:00:00.000Z"),
       updatedAt: new Date("2026-08-28T02:00:00.000Z"),
@@ -123,6 +135,7 @@ describe("users service", () => {
         },
       } as never,
       { write: vi.fn() } as never,
+      {} as never,
     );
 
     await expect(service.list({ page: 1, pageSize: 20 })).resolves.toEqual({
@@ -133,6 +146,9 @@ describe("users service", () => {
           firstName: user.firstName,
           lastName: user.lastName,
           status: "ACTIVE",
+          username: "reza",
+          credentialsReady: true,
+          mustChangePassword: false,
           lastLoginAt: "2026-08-28T01:00:00.000Z",
           createdAt: "2026-08-28T00:00:00.000Z",
           updatedAt: "2026-08-28T02:00:00.000Z",
@@ -149,6 +165,8 @@ describe("users service", () => {
       firstName: "رضا",
       lastName: "قایمی",
       status: UserStatus.ACTIVE,
+      username: "reza",
+      mustChangePassword: false,
       lastLoginAt: null,
       createdAt: new Date("2026-08-28T00:00:00.000Z"),
       updatedAt: new Date("2026-08-28T02:00:00.000Z"),
@@ -169,6 +187,7 @@ describe("users service", () => {
         },
       } as never,
       { write: vi.fn() } as never,
+      {} as never,
     );
 
     await expect(service.get(user.id)).resolves.toEqual({
@@ -177,6 +196,9 @@ describe("users service", () => {
       firstName: user.firstName,
       lastName: user.lastName,
       status: "ACTIVE",
+      username: "reza",
+      credentialsReady: true,
+      mustChangePassword: false,
       lastLoginAt: null,
       createdAt: "2026-08-28T00:00:00.000Z",
       updatedAt: "2026-08-28T02:00:00.000Z",

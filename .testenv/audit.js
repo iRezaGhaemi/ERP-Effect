@@ -17,11 +17,10 @@ const {browserLaunchOptions}=require('./browser');
       // login visuals
       const bg=await pg.evaluate(()=>getComputedStyle(document.body).backgroundColor);
       results.push('login bg='+bg+' (light expected: rgb(246, 246, 248))');
-      await pg.fill('#ph','09121234567');await pg.click('#btn-ph');await pg.waitForTimeout(1400);
-      const otp=await pg.$$eval('.otp-box',els=>els.length);
-      results.push('otp boxes='+otp);
-      await pg.$$eval('.otp-box',(els)=>els.forEach((el,i)=>{el.value='۱۲۳۴۵۶'[i];el.dispatchEvent(new Event('input',{bubbles:true}));}));
-      await pg.waitForTimeout(2600);
+      await pg.fill('#auth-username','demo.admin');
+      await pg.fill('#auth-password','DemoOnly-123!');
+      await pg.click('#btn-auth');
+      await pg.waitForTimeout(300);
       await pg.waitForSelector('.shell',{timeout:5000});
     }else{
       await pg.evaluate(()=>{S.authed=true;S.missionSeen=true;location.hash='#/dashboard';render();});

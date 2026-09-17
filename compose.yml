@@ -4,7 +4,8 @@ services:
     environment:
       POSTGRES_DB: effect_erp
       POSTGRES_USER: effect_migrator
-      POSTGRES_PASSWORD: effect-migrator-development
+      POSTGRES_PASSWORD: ${POSTGRES_MIGRATOR_PASSWORD:?set POSTGRES_MIGRATOR_PASSWORD}
+      POSTGRES_RUNTIME_PASSWORD: ${POSTGRES_RUNTIME_PASSWORD:?set POSTGRES_RUNTIME_PASSWORD}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U effect_migrator -d effect_erp"]
       interval: 5s
@@ -12,7 +13,7 @@ services:
       retries: 10
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./infra/postgres/init-runtime-role.sql:/docker-entrypoint-initdb.d/10-runtime-role.sql:ro
+      - ./infra/postgres/init-runtime-role.sh:/docker-entrypoint-initdb.d/10-runtime-role.sh:ro
 
   migrate:
     build:
@@ -20,10 +21,11 @@ services:
       dockerfile: apps/api/Dockerfile
     command: ["node", "dist/migrate.js"]
     environment:
-      DATABASE_MIGRATION_URL: postgres://effect_migrator:effect-migrator-development@postgres:5432/effect_erp
+      DATABASE_MIGRATION_URL: postgres://effect_migrator:${POSTGRES_MIGRATOR_PASSWORD:?set POSTGRES_MIGRATOR_PASSWORD}@postgres:5432/effect_erp
     depends_on:
       postgres:
         condition: service_healthy
+    read_only: true
 
   api:
     build:
@@ -32,14 +34,11 @@ services:
     environment:
       NODE_ENV: development
       API_PORT: 3001
-      DATABASE_URL: postgres://effect:effect@postgres:5432/effect_erp
+      DATABASE_URL: postgres://effect:${POSTGRES_RUNTIME_PASSWORD:?set POSTGRES_RUNTIME_PASSWORD}@postgres:5432/effect_erp
       WEB_ORIGIN: http://localhost:3000
       INTERNAL_API_URL: http://api:3001
-      OTP_PEPPER: ${OTP_PEPPER:-development-otp-pepper-must-be-32-chars}
-      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-development-jwt-secret-must-be-32-chars}
-      SMS_PROVIDER: console
-      OTP_DELIVERY_ACTIVATION_MARGIN_SECONDS: 5
-      INITIAL_ADMIN_PHONE: ${INITIAL_ADMIN_PHONE:-09121234567}
+      AUTH_RATE_LIMIT_SECRET: ${AUTH_RATE_LIMIT_SECRET:?set AUTH_RATE_LIMIT_SECRET}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?set JWT_ACCESS_SECRET}
       COOKIE_SECURE: "false"
     depends_on:
       seed:
@@ -48,13 +47,15 @@ services:
       test:
         [
           "CMD-SHELL",
-          "wget -qO- http://localhost:3001/api/v1/health/ready >/dev/null",
+          "wget -qO- http://127.0.0.1:3001/api/v1/health/ready >/dev/null",
         ]
       interval: 5s
       timeout: 5s
       retries: 10
     ports:
       - "127.0.0.1:3001:3001"
+    read_only: true
+    tmpfs: [/tmp]
 
   seed:
     build:
@@ -62,11 +63,14 @@ services:
       dockerfile: apps/api/Dockerfile
     command: ["node", "dist/seed.js"]
     environment:
-      DATABASE_URL: postgres://effect:effect@postgres:5432/effect_erp
-      INITIAL_ADMIN_PHONE: ${INITIAL_ADMIN_PHONE:-09121234567}
+      DATABASE_URL: postgres://effect:${POSTGRES_RUNTIME_PASSWORD:?set POSTGRES_RUNTIME_PASSWORD}@postgres:5432/effect_erp
+      INITIAL_ADMIN_PHONE: ${INITIAL_ADMIN_PHONE:?set INITIAL_ADMIN_PHONE}
+      INITIAL_ADMIN_USERNAME: ${INITIAL_ADMIN_USERNAME:?set INITIAL_ADMIN_USERNAME}
+      INITIAL_ADMIN_PASSWORD: ${INITIAL_ADMIN_PASSWORD:?set INITIAL_ADMIN_PASSWORD}
     depends_on:
       migrate:
         condition: service_completed_successfully
+    read_only: true
 
   web:
     build:
@@ -80,12 +84,14 @@ services:
       api:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:3000 >/dev/null"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000 >/dev/null"]
       interval: 5s
       timeout: 5s
       retries: 10
     ports:
       - "127.0.0.1:3000:3000"
+    read_only: true
+    tmpfs: [/tmp]
 
 volumes:
   postgres_data:

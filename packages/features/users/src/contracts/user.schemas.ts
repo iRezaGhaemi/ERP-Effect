@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { createPageSchema } from "@effect-erp/contracts";
+import { CreateCredentialsSchema } from "./credential.schemas.js";
 
 const persianDigits = "۰۱۲۳۴۵۶۷۸۹";
 const arabicDigits = "٠١٢٣٤٥٦٧٨٩";
@@ -25,6 +26,10 @@ export const CreateUserSchema = z.object({
 });
 
 export type CreateUserInput = z.input<typeof CreateUserSchema>;
+export const CreatePasswordUserSchema = CreateUserSchema.extend(
+  CreateCredentialsSchema.shape,
+);
+export type CreatePasswordUserInput = z.input<typeof CreatePasswordUserSchema>;
 
 export const UpdateUserSchema = CreateUserSchema.partial().refine(
   (value) => Object.keys(value).length > 0,
@@ -41,6 +46,9 @@ export const UserDtoSchema = z.object({
   firstName: z.string(),
   lastName: z.string(),
   status: z.enum(["ACTIVE", "SUSPENDED"]),
+  username: z.string().nullable(),
+  credentialsReady: z.boolean(),
+  mustChangePassword: z.boolean(),
   lastLoginAt: z.iso.datetime().nullable(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),

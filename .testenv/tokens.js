@@ -6,9 +6,8 @@ const {browserLaunchOptions}=require('./browser');
   const pg=await b.newPage({viewport:{width:1500,height:950}});
   await pg.goto(APP_URL);
   await pg.waitForTimeout(300);
-  await pg.fill('#ph','09121234567');await pg.click('#btn-ph');await pg.waitForTimeout(1300);
-  await pg.$$eval('.otp-box',(els)=>els.forEach((el,i)=>{el.value='۱۲۳۴۵۶'[i];el.dispatchEvent(new Event('input',{bubbles:true}));}));
-  await pg.waitForTimeout(2600);await pg.waitForSelector('.shell');await pg.waitForTimeout(500);
+  await pg.fill('#auth-username','demo.admin');await pg.fill('#auth-password','DemoOnly-123!');await pg.click('#btn-auth');
+  await pg.waitForSelector('.shell');await pg.waitForTimeout(500);
   const r=await pg.evaluate(()=>{
     const cs=s=>getComputedStyle(document.querySelector(s));
     const btn=cs('.btn-pr'), card=cs('.card'), kpi=cs('.kpi'), on=cs('.sb-item.on'), body=cs('body');

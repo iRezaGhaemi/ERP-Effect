@@ -9,15 +9,10 @@ const {browserLaunchOptions}=require('./browser');
   await pg.goto(APP_URL);
   await pg.waitForTimeout(600);
   await pg.screenshot({path:artifactPath('shot-login.png')});
-  // login → otp
-  await pg.fill('#ph','09121234567');
-  await pg.click('#btn-ph');
-  await pg.waitForTimeout(1300);
-  await pg.screenshot({path:artifactPath('shot-otp.png')});
-  // enter code
-  const boxes=await pg.$$('.otp-box');
-  let i=0;for(const bx of boxes){await bx.fill('123456'.split('')[i]);i++;}
-  await pg.waitForTimeout(2400);
+  // demo username/password login
+  await pg.fill('#auth-username','demo.admin');
+  await pg.fill('#auth-password','DemoOnly-123!');
+  await pg.click('#btn-auth');
   await pg.waitForSelector('.shell');
   await pg.waitForTimeout(900); // mission popup
   await pg.screenshot({path:artifactPath('shot-mission.png')});

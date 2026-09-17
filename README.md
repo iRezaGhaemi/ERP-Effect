@@ -1,13 +1,15 @@
-# Effect ERP — پروتوتایپ رابط کاربری
+# Effect ERP — زیرساخت محصول و پروتوتایپ رابط کاربری
 
-> **وضعیت فعلی: checkpoint توسعه، نه نسخه آماده انتشار.** طبق تصمیم جدید، ورود محصول باید با نام‌کاربری و رمز عبور باشد و OTP حذف شود. این تغییر هنوز پیاده‌سازی نشده؛ کد فعلی برای حفظ پیشرفت تا این مرحله ثبت شده است. اجرای کامل پذیرش نهایی نشده و تست مرورگر فعلی یک خطای selector شناخته‌شده دارد. جزئیات در [گزارش وضعیت](docs/progress/2026-08-31-foundation-checkpoint.md).
+> **وضعیت فعلی:** فاز پایهٔ هویت برای یک شرکت با نام‌کاربری/رمز عبور پیاده‌سازی شده است. ماژول‌های کاربران، نقش‌ها، دسترسی‌ها، نشست‌ها و audit به PostgreSQL متصل‌اند؛ CRM، مالی، تسک، مرخصی و گزارش‌ها هنوز prototype هستند.
 
 ## Foundation and identity — Phase 1
 
-The pnpm workspace implements single-company OTP login, users, roles,
-permissions/overrides, sessions, and append-only audit history.
+The pnpm workspace implements single-company username/password login, forced
+temporary-password changes, users, roles, permissions/overrides, sessions, and
+append-only audit history.
 **CRM, finance, tasks, leave, and reports remain prototype-only.**
-The standalone demo below is preserved; its demo OTP is not an API credential.
+The standalone demo below has explicit demo-only credentials and is not connected
+to the API or a real account.
 
 ### Development
 
@@ -16,17 +18,19 @@ Prerequisites: Node **24.x**, Corepack, Docker with Compose v2, and Git.
 ```bash
 corepack enable
 cp .env.example .env
+# Replace every replace-with-* value. Keep both database URL passwords equal to
+# their corresponding POSTGRES_*_PASSWORD values.
 pnpm install --frozen-lockfile
-docker compose up --build
+docker compose up --build --wait
 ```
 
 Open http://localhost:3000/login. Compose starts PostgreSQL, runs a separate
 migration job and idempotent initial-admin seed, then starts API and web.
-Set `INITIAL_ADMIN_PHONE`, `OTP_PEPPER`, and `JWT_ACCESS_SECRET` in `.env`;
-defaults are development examples only. Retrieve the local OTP with
-`docker compose logs -f api`: only the explicitly development-only `[DEV OTP]`
-console line contains it. The six OTP digit inputs accept typing/paste.
-No SMS inspection endpoint is built into development or production.
+Set unique values for the two PostgreSQL passwords, `AUTH_RATE_LIMIT_SECRET`,
+`JWT_ACCESS_SECRET`, `INITIAL_ADMIN_PHONE`, `INITIAL_ADMIN_USERNAME` and
+`INITIAL_ADMIN_PASSWORD`. The seed job creates temporary credentials only when
+the selected system administrator has none; rerunning it never overwrites an
+existing password. The first login must change the temporary password.
 
 ```bash
 docker compose run --rm migrate
@@ -35,6 +39,17 @@ docker compose run --rm seed
 pnpm db:migrate
 pnpm db:seed
 ```
+
+For explicit operator recovery, identify an existing system-super-admin UUID and
+pipe a new password from a secret manager. The password is never accepted in argv:
+
+```bash
+secret-manager read effect/admin-password | \
+  pnpm --filter @effect/api reset-admin -- --user-id <admin-uuid> --password-stdin
+```
+
+The command keeps roles/status unchanged, revokes existing sessions, writes an
+audit event transactionally and creates a 24-hour temporary password.
 
 `DATABASE_MIGRATION_URL` uses the privileged migration role; `DATABASE_URL`
 uses the restricted runtime role. API startup rejects a superuser/schema-owner
@@ -45,7 +60,9 @@ runtime connection. Never point tests at application databases.
 ```bash
 pnpm --filter @effect/web exec playwright install --with-deps chromium
 npm ci --prefix .testenv
-docker compose -f compose.test.yml up -d --build --wait
+export TASK5_COMPOSE_PROJECT_NAME=effect-task5-local
+export TASK5_COMPOSE_FILE=compose.test.yml
+docker compose -p "$TASK5_COMPOSE_PROJECT_NAME" -f "$TASK5_COMPOSE_FILE" up -d --build --wait
 pnpm lint
 pnpm typecheck
 pnpm test
@@ -54,18 +71,18 @@ pnpm test:e2e
 pnpm build
 ./build.sh
 npm test --prefix .testenv
-docker compose -f compose.test.yml down -v
+node --test tooling/smoke/compose-healthchecks.test.mjs
+docker compose -p "$TASK5_COMPOSE_PROJECT_NAME" -f "$TASK5_COMPOSE_FILE" down -v
 git diff --check
 ```
 
 The test stack uses localhost ports **3100/3101** and an anonymous disposable
 PostgreSQL volume. Always run its `down -v`, including after failure. Integration
 and API tests create separate disposable PostgreSQL containers. Run the browser
-journey on a fresh stack; it keeps the real 60-second resend policy and revokes
-a second independent session. The dedicated test API image uses `NODE_ENV=test`
-and fake SMS; its `/api/v1/test/sms/latest` endpoint replaces log scraping.
-Failure traces contain isolated fixture credentials: never run these tests on
-live accounts. CI caches only pnpm store data and uploads traces only on failure.
+journey on a fresh stack. It validates forced password changes, administrator
+reset, session revocation, roles/overrides/suspension and audit. Failure traces
+contain isolated fixture credentials: never run these tests on live accounts.
+CI caches only pnpm store data and uploads traces only on failure.
 
 Generate OpenAPI with `pnpm --filter @effect/api openapi:generate` and verify
 `git diff --exit-code -- apps/api/openapi.json`.
@@ -77,7 +94,7 @@ docker build -f apps/api/Dockerfile --target runner -t effect-api:release .
 docker build -f apps/web/Dockerfile --build-arg INTERNAL_API_URL=http://api:3001 -t effect-web:release .
 # Inject migration credentials separately through your deployment secret store:
 docker run --rm --env-file /secure/path/migration.env effect-api:release node dist/migrate.js
-# Inject restricted DATABASE_URL and INITIAL_ADMIN_PHONE:
+# Inject restricted DATABASE_URL plus initial administrator bootstrap inputs:
 docker run --rm --env-file /secure/path/seed.env effect-api:release node dist/seed.js
 ```
 
@@ -91,12 +108,12 @@ checks the process. Web includes Next standalone output, public fonts and artwor
 variable: build for the deployment's internal API address.
 
 Terminate HTTPS at a trusted same-origin reverse proxy. Set `NODE_ENV=production`,
-`WEB_ORIGIN` to the public HTTPS origin, secrets of at least 32 characters,
-`SMS_PROVIDER=http`, `SMS_HTTP_URL`, `SMS_HTTP_TOKEN`, and
-`OTP_DELIVERY_ACTIVATION_MARGIN_SECONDS=5`. Production rejects console/fake SMS
-and insecure cookies. Keep `synchronize:false`; never log raw OTP, cookies or
-tokens. Authentication cookies are HttpOnly/Secure, and mutations require Origin
-and CSRF. Do not expose the internal API directly to browsers.
+`WEB_ORIGIN` to the public HTTPS origin, independent secrets of at least 32
+characters for JWT and auth rate limiting, and secure cookies. Keep bootstrap
+inputs on the one-shot seed job and out of API/web replicas. Keep
+`synchronize:false`; never log passwords, password hashes, cookies or tokens.
+Authentication cookies are HttpOnly/Secure, and mutations require Origin and
+CSRF. Do not expose the internal API directly to browsers.
 
 ---
 
@@ -113,8 +130,8 @@ and CSRF. Do not expose the internal API directly to browsers.
 
 | مرحله | مقدار |
 |---|---|
-| شماره موبایل | `۰۹۱۲۱۲۳۴۵۶۷` (یا هر شماره معتبر ۰۹…) |
-| کد تایید | `۱۲۳۴۵۶` |
+| نام کاربری | `demo.admin` |
+| رمز عبور نمایشی | `DemoOnly-123!` |
 | میان‌بر | دکمه «ورود سریع نسخه دمو» |
 
 کاربر دمو: **رضا قایمی — مدیرعامل** (دسترسی کامل + ویجت‌های مدیریتی)
@@ -255,9 +272,9 @@ src/15..25-*.js        ← ماژول‌های محصول
 - **فونت IRANSansX** (دانلود از Drive مرجع → subset سه وزن 400/500/600 با پوشش کامل فارسی) در کل رابط؛ Ravi حذف شد.
 - **نمودارهای میله‌ای شفاف:** همه bar chartها rgba(111,106,235,.35) + hover تا .75 + selected .92 (SVG و CSS) — سبک، داده‌محور، بدون گرادیان.
 
-### لاگین دو ستونه
+### لاگین دو ستونه (تاریخچهٔ طراحی v2.4)
 - **راست: تصویر full-bleed** (100% عرض/ارتفاع ستون، object-fit:cover، تینت #6F6AEB، بدون کارت/حاشیه).
-- **چپ: باکس ورود** عمودی‌مرکز: لوگو → «به Effect ERP خوش آمدید» → ورود موبایل → OTP شش‌رقمی → «ویرایش شماره موبایل».
+- **چپ: باکس ورود** عمودی‌مرکز: لوگو → «به Effect ERP خوش آمدید» → نام کاربری و رمز عبور نمایشی.
 - ارتفاع لاگین دقیقاً ۱۰۰vh (بدون اسکرول صفحه) در همه سایزهای دسکتاپ؛ کارت با `margin:auto` مرکز است و در نمای کوتاه، فقط ستون فرم اسکرول می‌شود.
 - موبایل (≤900px): تصویر مخفی، فرم تمام‌عرض.
 
@@ -274,4 +291,4 @@ src/15..25-*.js        ← ماژول‌های محصول
 ### تست‌ها (همه سبز)
 smoke (شامل فلو ورود دو ستونه) · leak · audit · containment (۴vp×۴۳ مسیر) · tokens (#6F6AEB/IRANSansX) · qa23 · **qa24**: ۲۴ سناریو (لاگین دو ستونه + موبایل، دکمه expand، رنگ، فونت، شفافیت چارت، گزارش دستی e2e، صفر ایموجی/سایه).
 
-— پروتوتایپ UI؛ بدون بک‌اند واقعی.
+— این بخش تاریخچهٔ طراحی UI است؛ توضیحات احراز هویت قدیمی آن با فاز پایهٔ فعلی جایگزین شده‌اند. prototype مستقل به بک‌اند واقعی متصل نیست.

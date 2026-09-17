@@ -17,11 +17,9 @@ import {
   AuthSessionListQuerySchema,
   AuthSessionPageSchema,
   AuthSessionResponseSchema,
-  MeResponseSchema,
-  RequestOtpResponseSchema,
-  RequestOtpSchema,
   CsrfTokenSchema,
-  VerifyOtpSchema,
+  LoginSchema,
+  MeResponseSchema,
 } from "@effect/auth/contracts";
 import { AuditLogPageSchema, AuditQuerySchema } from "@effect/audit/contracts";
 import {
@@ -31,7 +29,10 @@ import {
   UuidIdParamsSchema,
 } from "@effect-erp/contracts";
 import {
-  CreateUserSchema,
+  ChangePasswordSchema,
+  CreatePasswordUserSchema,
+  ResetPasswordSchema,
+  SetupCredentialsSchema,
   UpdateUserSchema,
   UserDetailDtoSchema,
   UserDtoSchema,
@@ -50,20 +51,22 @@ const componentSchemas: Record<string, z.ZodType> = {
   AuthSessionListQuery: AuthSessionListQuerySchema,
   AuthSessionPage: AuthSessionPageSchema,
   AuthSessionResponse: AuthSessionResponseSchema,
+  ChangePassword: ChangePasswordSchema,
   CreateRole: CreateRoleSchema,
-  CreateUser: CreateUserSchema,
+  CreatePasswordUser: CreatePasswordUserSchema,
   ErrorEnvelope: ErrorEnvelopeSchema,
   HealthResponse: HealthResponseSchema,
+  Login: LoginSchema,
   MeResponse: MeResponseSchema,
   OkResponse: OkResponseSchema,
   PermissionDto: PermissionDtoSchema,
   PermissionPage: PermissionPageSchema,
   ReplacePermissionOverrides: ReplacePermissionOverridesSchema,
   ReplaceUserRoles: ReplaceUserRolesSchema,
-  RequestOtp: RequestOtpSchema,
-  RequestOtpResponse: RequestOtpResponseSchema,
+  ResetPassword: ResetPasswordSchema,
   RoleDto: RoleDtoSchema,
   RolePage: RolePageSchema,
+  SetupCredentials: SetupCredentialsSchema,
   UpdateRole: UpdateRoleSchema,
   UpdateUser: UpdateUserSchema,
   UserDetailDto: UserDetailDtoSchema,
@@ -71,23 +74,24 @@ const componentSchemas: Record<string, z.ZodType> = {
   UserPage: UserPageSchema,
   UserPageQuery: UserPageQuerySchema,
   UuidIdParams: UuidIdParamsSchema,
-  VerifyOtp: VerifyOtpSchema,
 };
 
 const inputComponentSchemas = new Set([
   "AccessPageQuery",
   "AuditQuery",
   "AuthSessionListQuery",
+  "ChangePassword",
   "CreateRole",
-  "CreateUser",
+  "CreatePasswordUser",
+  "Login",
   "ReplacePermissionOverrides",
   "ReplaceUserRoles",
-  "RequestOtp",
+  "ResetPassword",
+  "SetupCredentials",
   "UpdateRole",
   "UpdateUser",
   "UserPageQuery",
   "UuidIdParams",
-  "VerifyOtp",
 ]);
 
 function jsonSchema(
@@ -102,10 +106,12 @@ function reference(name: string): JsonObject {
   return { $ref: `#/components/schemas/${name}` };
 }
 
-function response(description: string, schemaName: string): JsonObject {
+function response(description: string, schemaName?: string): JsonObject {
   return {
     description,
-    content: { "application/json": { schema: reference(schemaName) } },
+    ...(schemaName
+      ? { content: { "application/json": { schema: reference(schemaName) } } }
+      : {}),
   };
 }
 
@@ -197,7 +203,7 @@ function operation(input: {
   requestSchema?: string;
   parameters?: JsonObject[];
   successStatus: string;
-  successSchema: string;
+  successSchema?: string;
 }): JsonObject {
   const mutation = input.mutation ?? false;
   const security = input.security ?? "access";
@@ -253,24 +259,23 @@ export function buildOpenApiDocument(): JsonObject {
       "/api/v1/health/ready": {
         get: healthOperation("HealthController_readiness"),
       },
-      "/api/v1/auth/otp/request": {
+      "/api/v1/auth/login": {
         post: operation({
-          operationId: "AuthController_requestOtp",
+          operationId: "AuthController_login",
           tags: ["auth"],
           security: "public",
           mutation: true,
-          requestSchema: "RequestOtp",
-          successStatus: "202",
-          successSchema: "RequestOtpResponse",
+          requestSchema: "Login",
+          successStatus: "200",
+          successSchema: "AuthSessionResponse",
         }),
       },
-      "/api/v1/auth/otp/verify": {
+      "/api/v1/auth/password/change": {
         post: operation({
-          operationId: "AuthController_verifyOtp",
+          operationId: "AuthController_changePassword",
           tags: ["auth"],
-          security: "public",
           mutation: true,
-          requestSchema: "VerifyOtp",
+          requestSchema: "ChangePassword",
           successStatus: "200",
           successSchema: "AuthSessionResponse",
         }),
@@ -342,7 +347,7 @@ export function buildOpenApiDocument(): JsonObject {
           operationId: "UsersController_create",
           tags: ["users"],
           mutation: true,
-          requestSchema: "CreateUser",
+          requestSchema: "CreatePasswordUser",
           successStatus: "201",
           successSchema: "UserDto",
         }),
@@ -383,6 +388,26 @@ export function buildOpenApiDocument(): JsonObject {
           parameters: [idParameter()],
           successStatus: "200",
           successSchema: "UserDto",
+        }),
+      },
+      "/api/v1/users/{id}/credentials": {
+        post: operation({
+          operationId: "CredentialAdminController_setup",
+          tags: ["users"],
+          mutation: true,
+          parameters: [idParameter()],
+          requestSchema: "SetupCredentials",
+          successStatus: "204",
+        }),
+      },
+      "/api/v1/users/{id}/password/reset": {
+        post: operation({
+          operationId: "CredentialAdminController_reset",
+          tags: ["users"],
+          mutation: true,
+          parameters: [idParameter()],
+          requestSchema: "ResetPassword",
+          successStatus: "204",
         }),
       },
       "/api/v1/roles": {

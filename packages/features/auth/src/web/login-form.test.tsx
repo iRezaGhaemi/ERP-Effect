@@ -1,144 +1,114 @@
 import { ApiError } from "@effect-erp/contracts";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { LoginForm, type LoginAuthClient } from "./login-form.js";
 
-const challengeId = "e8292771-e347-4f55-ad5f-ed813cfa42b5";
+const authSession = {
+  user: {
+    id: "013a40c7-82e7-4435-a5d6-988b03fdce37",
+    phone: "+989121234567",
+    firstName: "سارا",
+    lastName: "رضایی",
+    status: "ACTIVE" as const,
+    username: "sara.rezaei",
+    credentialsReady: true,
+    mustChangePassword: false,
+    lastLoginAt: "2026-09-01T10:00:00.000Z",
+    createdAt: "2026-08-28T10:00:00.000Z",
+    updatedAt: "2026-09-01T10:00:00.000Z",
+  },
+  sessionId: "35cce04f-5ac1-497c-9798-951e935cdcf0",
+};
 
-afterEach(() => {
-  cleanup();
-  vi.useRealTimers();
-});
+afterEach(cleanup);
 
-function client(overrides: Partial<LoginAuthClient> = {}): LoginAuthClient {
-  return {
-    requestOtp: vi.fn().mockResolvedValue({
-      accepted: true,
-      challengeId,
-      retryAfterSeconds: 60,
-    }),
-    verifyOtp: vi.fn().mockResolvedValue({}),
-    ...overrides,
-  };
+function client(login = vi.fn().mockResolvedValue(authSession)): LoginAuthClient {
+  return { login };
 }
 
 describe("LoginForm", () => {
-  it("normalizes Persian digits and moves from phone to six-digit OTP", async () => {
-    const fakeClient = client();
+  it("renders labeled username/password controls with stable autocomplete and no OTP UI", () => {
+    render(<LoginForm client={client()} />);
+
+    expect(screen.getByLabelText("نام کاربری")).toHaveProperty("autocomplete", "username");
+    expect(screen.getByLabelText("گذرواژه")).toHaveProperty("autocomplete", "current-password");
+    expect(screen.getByLabelText("گذرواژه")).toHaveProperty("type", "password");
+    expect(screen.queryByText(/کد تأیید|شماره موبایل|ارسال مجدد/)).toBeNull();
+  });
+
+  it("reveals and hides the password without changing its autocomplete meaning", async () => {
     const user = userEvent.setup();
-    render(<LoginForm client={fakeClient} />);
+    render(<LoginForm client={client()} />);
+    const password = screen.getByLabelText("گذرواژه");
 
-    await user.type(screen.getByLabelText("شماره موبایل"), "۰۹۱۲۱۲۳۴۵۶۷");
-    await user.click(screen.getByRole("button", { name: "دریافت کد تأیید" }));
-
-    expect(fakeClient.requestOtp).toHaveBeenCalledWith({ phone: "09121234567" });
-    expect(await screen.findAllByLabelText(/رقم/)).toHaveLength(6);
+    await user.click(screen.getByRole("button", { name: "نمایش گذرواژه" }));
+    expect(password).toHaveProperty("type", "text");
+    expect(password).toHaveProperty("autocomplete", "current-password");
+    await user.click(screen.getByRole("button", { name: "پنهان کردن گذرواژه" }));
+    expect(password).toHaveProperty("type", "password");
   });
 
-  it("shows the API error message below the phone field", async () => {
-    const fakeClient = client({
-      requestOtp: vi.fn().mockRejectedValue(
-        new ApiError({
-          code: "RATE_LIMITED",
-          message: "لطفاً کمی بعد دوباره تلاش کنید.",
-          fields: {},
-          requestId: "request-1",
-        }),
-      ),
-    });
+  it("submits username/password and disables all credential controls while pending", async () => {
+    let resolveLogin: ((value: typeof authSession) => void) | undefined;
+    const login = vi.fn().mockImplementation(() => new Promise((resolve) => { resolveLogin = resolve; }));
     const user = userEvent.setup();
-    render(<LoginForm client={fakeClient} />);
+    render(<LoginForm client={client(login)} />);
 
-    await user.type(screen.getByLabelText("شماره موبایل"), "09121234567");
-    await user.click(screen.getByRole("button", { name: "دریافت کد تأیید" }));
+    await user.type(screen.getByLabelText("نام کاربری"), "sara.rezaei");
+    await user.type(screen.getByLabelText("گذرواژه"), "Login secret");
+    await user.click(screen.getByRole("button", { name: "ورود" }));
 
-    expect((await screen.findByRole("alert")).textContent).toContain("لطفاً کمی بعد دوباره تلاش کنید.");
+    expect(login).toHaveBeenCalledWith({ username: "sara.rezaei", password: "Login secret" });
+    expect(screen.getByRole("button", { name: "در حال ورود…" })).toHaveProperty("disabled", true);
+    expect(screen.getByLabelText("نام کاربری")).toHaveProperty("disabled", true);
+    expect(screen.getByLabelText("گذرواژه")).toHaveProperty("disabled", true);
+    expect(screen.getByRole("button", { name: "نمایش گذرواژه" })).toHaveProperty("disabled", true);
+    resolveLogin?.(authSession);
   });
 
-  it("counts down before enabling resend", async () => {
-    vi.useFakeTimers();
-    const fakeClient = client({
-      requestOtp: vi.fn().mockResolvedValue({
-        accepted: true,
-        challengeId,
-        retryAfterSeconds: 2,
-      }),
-    });
-    render(<LoginForm client={fakeClient} />);
-
-    fireEvent.change(screen.getByLabelText("شماره موبایل"), { target: { value: "09121234567" } });
-    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "دریافت کد تأیید" })); });
-
-    expect(screen.getByText("ارسال مجدد تا ۲ ثانیه").textContent).toBe("ارسال مجدد تا ۲ ثانیه");
-    await act(async () => { await vi.advanceTimersByTimeAsync(2_000); });
-    expect(screen.getByRole("button", { name: "ارسال مجدد کد" })).not.toHaveProperty("disabled", true);
-  });
-
-  it("submits a pasted six-digit code", async () => {
-    const fakeClient = client();
-    const user = userEvent.setup();
-    render(<LoginForm client={fakeClient} />);
-
-    await user.type(screen.getByLabelText("شماره موبایل"), "09121234567");
-    await user.click(screen.getByRole("button", { name: "دریافت کد تأیید" }));
-    await screen.findAllByLabelText(/رقم/);
-    await user.click(screen.getByLabelText("رقم ۱"));
-    await user.paste("۱۲۳۴۵۶");
-
-    await waitFor(() =>
-      expect(fakeClient.verifyOtp).toHaveBeenCalledWith({
-        challengeId,
-        code: "123456",
-      }),
-    );
-  });
-
-  it("submits a complete code with Enter", async () => {
-    const fakeClient = client();
-    const user = userEvent.setup();
-    render(<LoginForm client={fakeClient} />);
-
-    await user.type(screen.getByLabelText("شماره موبایل"), "09121234567");
-    await user.click(screen.getByRole("button", { name: "دریافت کد تأیید" }));
-    const digits = await screen.findAllByLabelText(/رقم/);
-    for (const [index, input] of digits.entries()) await user.type(input, String(index + 1));
-    await user.keyboard("{Enter}");
-
-    await waitFor(() => expect(fakeClient.verifyOtp).toHaveBeenCalledTimes(1));
-  });
-
-  it("disables duplicate submits while an OTP request is pending", async () => {
-    let resolveRequest: ((value: { accepted: true; challengeId: string; retryAfterSeconds: number }) => void) | undefined;
-    const fakeClient = client({
-      requestOtp: vi.fn().mockImplementation(
-        () => new Promise((resolve) => { resolveRequest = resolve; }),
-      ),
-    });
-    const user = userEvent.setup();
-    render(<LoginForm client={fakeClient} />);
-
-    await user.type(screen.getByLabelText("شماره موبایل"), "09121234567");
-    await user.click(screen.getByRole("button", { name: "دریافت کد تأیید" }));
-
-    expect(screen.getByRole("button", { name: "در حال ارسال…" })).toHaveProperty("disabled", true);
-    resolveRequest?.({ accepted: true, challengeId, retryAfterSeconds: 60 });
-    expect(await screen.findAllByLabelText(/رقم/)).toHaveLength(6);
-  });
-
-  it("calls onAuthenticated after successful verification", async () => {
+  it("passes the complete authenticated session to navigation and clears the password", async () => {
     const onAuthenticated = vi.fn();
-    const fakeClient = client();
     const user = userEvent.setup();
-    render(<LoginForm client={fakeClient} onAuthenticated={onAuthenticated} />);
+    render(<LoginForm client={client()} onAuthenticated={onAuthenticated} />);
 
-    await user.type(screen.getByLabelText("شماره موبایل"), "09121234567");
-    await user.click(screen.getByRole("button", { name: "دریافت کد تأیید" }));
-    const digits = await screen.findAllByLabelText(/رقم/);
-    for (const [index, input] of digits.entries()) await user.type(input, String(index + 1));
-    await user.click(screen.getByRole("button", { name: "تأیید و ورود" }));
+    await user.type(screen.getByLabelText("نام کاربری"), "sara.rezaei");
+    await user.type(screen.getByLabelText("گذرواژه"), "Login secret");
+    await user.click(screen.getByRole("button", { name: "ورود" }));
 
-    await waitFor(() => expect(onAuthenticated).toHaveBeenCalledOnce());
+    await waitFor(() => expect(onAuthenticated).toHaveBeenCalledWith(authSession));
+    expect(screen.getByLabelText("گذرواژه")).toHaveProperty("value", "");
+  });
+
+  it("shows the same generic Persian error for account and transport failures without rendering secrets", async () => {
+    const failures = [
+      new ApiError({ code: "INVALID_CREDENTIALS", message: "account-specific server copy", fields: {}, requestId: "request-1" }),
+      new Error("transport included secret: Login secret"),
+    ];
+
+    for (const failure of failures) {
+      const user = userEvent.setup();
+      const view = render(<LoginForm client={client(vi.fn().mockRejectedValue(failure))} />);
+      await user.type(screen.getByLabelText("نام کاربری"), "sara.rezaei");
+      await user.type(screen.getByLabelText("گذرواژه"), "Login secret");
+      await user.click(screen.getByRole("button", { name: "ورود" }));
+
+      expect((await screen.findByRole("alert")).textContent).toBe("نام کاربری یا گذرواژه صحیح نیست. دوباره تلاش کنید.");
+      expect(view.container.textContent).not.toContain("Login secret");
+      expect(view.container.textContent).not.toContain("account-specific");
+      view.unmount();
+    }
+  });
+
+  it("clears a typed password when the form unmounts", async () => {
+    const user = userEvent.setup();
+    const view = render(<LoginForm client={client()} />);
+    const password = screen.getByLabelText("گذرواژه");
+    await user.type(password, "Login secret");
+
+    view.unmount();
+
+    expect(password.value).toBe("");
   });
 });

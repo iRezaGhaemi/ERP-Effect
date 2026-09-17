@@ -3,9 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { TokenService } from "./token.service.js";
 
 const options = {
-  pepper: "token-test-otp-pepper-at-least-32-characters",
-  ttlSeconds: 120,
-  resendSeconds: 60,
+  rateLimitSecret: "token-test-rate-limit-secret-at-least-32-characters",
   jwtAccessSecret: "token-test-jwt-secret-at-least-32-characters",
   accessTtlSeconds: 900,
   refreshTtlDays: 30,
@@ -28,6 +26,8 @@ describe("TokenService", () => {
         userId: "6e444c58-63ee-4c74-b39d-f72a5eb84d3f",
         sessionId: "7f29f0a6-ecae-4f46-afec-c6fe306502bd",
         phone: "+989121234567",
+        credentialVersion: 7,
+        mustChangePassword: true,
       });
       const [encodedHeader] = token.split(".");
 
@@ -39,6 +39,8 @@ describe("TokenService", () => {
         sub: "6e444c58-63ee-4c74-b39d-f72a5eb84d3f",
         sid: "7f29f0a6-ecae-4f46-afec-c6fe306502bd",
         phone: "+989121234567",
+        cv: 7,
+        mcp: true,
         iat: Math.floor(now.getTime() / 1_000),
         exp: Math.floor(now.getTime() / 1_000) + 900,
       });
@@ -56,6 +58,8 @@ describe("TokenService", () => {
       userId: "6e444c58-63ee-4c74-b39d-f72a5eb84d3f",
       sessionId: "7f29f0a6-ecae-4f46-afec-c6fe306502bd",
       phone: "+989121234567",
+      credentialVersion: 7,
+      mustChangePassword: false,
     });
     const tampered = `${accessToken.slice(0, -1)}${
       accessToken.endsWith("a") ? "b" : "a"

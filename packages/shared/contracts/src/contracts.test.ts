@@ -22,8 +22,14 @@ describe('shared contracts', () => {
       sessionId: 'a28f3e79-1f62-443b-9b02-95d3918558b1',
       phone: '09121234567',
       permissions: ['users:read'],
+      credentialVersion: 3,
+      mustChangePassword: false,
     });
 
     expect(principal.sessionId).toBe('a28f3e79-1f62-443b-9b02-95d3918558b1');
+    expect(principal).toMatchObject({
+      credentialVersion: 3,
+      mustChangePassword: false,
+    });
   });
 });

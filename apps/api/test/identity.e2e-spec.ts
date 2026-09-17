@@ -66,12 +66,15 @@ const authorizedPrincipal: AuthenticatedPrincipal = {
   permissions: [
     "users:read",
     "users:create",
+    "users:credentials:manage",
     "users:update",
     "users:suspend",
     "roles:manage",
     "sessions:revoke",
     "audit:read",
   ],
+  credentialVersion: 1,
+  mustChangePassword: false,
 };
 
 class TestingAuthenticationGuard implements CanActivate {
@@ -117,6 +120,9 @@ async function createApp(): Promise<INestApplication> {
         ...validUser,
         phone: "+989123334444",
         status: "ACTIVE",
+        username: "test.user",
+        credentialsReady: true,
+        mustChangePassword: true,
         lastLoginAt: null,
         createdAt: "2026-08-28T00:00:00.000Z",
         updatedAt: "2026-08-28T00:00:00.000Z",
@@ -210,7 +216,9 @@ describe("identity API security boundary", () => {
   it("documents cookie authentication plus Origin and CSRF semantics", async () => {
     const document = await openApiDocument();
     const usersCreate = document.paths["/api/v1/users"]?.post;
-    const otpRequest = document.paths["/api/v1/auth/otp/request"]?.post;
+    const login = document.paths["/api/v1/auth/login"]?.post;
+    const passwordChange =
+      document.paths["/api/v1/auth/password/change"]?.post;
     const refresh = document.paths["/api/v1/auth/refresh"]?.post;
     const live = document.paths["/api/v1/health/live"]?.get;
 
@@ -227,7 +235,8 @@ describe("identity API security boundary", () => {
       },
     });
     expect(usersCreate?.security).toEqual([{ AccessCookieAuth: [] }]);
-    expect(otpRequest?.security).toEqual([]);
+    expect(login?.security).toEqual([]);
+    expect(passwordChange?.security).toEqual([{ AccessCookieAuth: [] }]);
     expect(refresh?.security).toEqual([{ RefreshCookieAuth: [] }]);
     expect(live?.security).toEqual([]);
     expect(parameter(usersCreate as OpenApiOperation, "Origin")).toMatchObject({
@@ -243,13 +252,16 @@ describe("identity API security boundary", () => {
         pattern: "^[A-Za-z0-9_-]{43}$",
       },
     });
-    expect(parameter(otpRequest as OpenApiOperation, "Origin")).toMatchObject({
+    expect(parameter(login as OpenApiOperation, "Origin")).toMatchObject({
       in: "header",
       required: true,
     });
-    expect(parameter(otpRequest as OpenApiOperation, "x-csrf-token")).toBe(
+    expect(parameter(login as OpenApiOperation, "x-csrf-token")).toBe(
       undefined,
     );
+    expect(
+      parameter(passwordChange as OpenApiOperation, "x-csrf-token"),
+    ).toMatchObject({ in: "header", required: true });
     expect(parameter(refresh as OpenApiOperation, "Origin")).toMatchObject({
       in: "header",
       required: true,
@@ -257,6 +269,15 @@ describe("identity API security boundary", () => {
     expect(parameter(refresh as OpenApiOperation, "x-csrf-token")).toBe(
       undefined,
     );
+  });
+
+  it("documents every password endpoint and excludes OTP or fake-SMS routes and schemas", async () => {
+    const document = await openApiDocument();
+    expect(document.paths).toHaveProperty("/api/v1/auth/login.post");
+    expect(document.paths).toHaveProperty("/api/v1/auth/password/change.post");
+    expect(document.paths).toHaveProperty("/api/v1/users/{id}/credentials.post");
+    expect(document.paths).toHaveProperty("/api/v1/users/{id}/password/reset.post");
+    expect(JSON.stringify(document)).not.toMatch(/otp|sms/i);
   });
 
   it("documents defaulted pagination fields as optional request inputs", async () => {

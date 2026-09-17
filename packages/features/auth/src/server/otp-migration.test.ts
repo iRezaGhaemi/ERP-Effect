@@ -18,7 +18,6 @@ describe("OTP migration 006", () => {
     await migration.up(runner);
 
     const sql = queries.join("\n");
-    expect(migration.name).toBe("CreateOtp202608280006");
     expect(sql).toContain('CREATE TABLE "otp_challenges"');
     expect(sql).toContain('"code_hash" character(64) NOT NULL');
     expect(sql).toContain('CREATE TABLE "rate_limit_buckets"');
@@ -45,7 +44,6 @@ describe("OTP delivery outbox migration 007", () => {
     await migration.up(runner);
 
     const sql = queries.join("\n");
-    expect(migration.name).toBe("CreateOtpDeliveryOutbox202608280007");
     expect(sql).toContain('CREATE TABLE "otp_delivery_jobs"');
     expect(sql).toContain('"code_ciphertext" text NOT NULL');
     expect(sql).toContain('"code_nonce" character varying(24) NOT NULL');
@@ -72,7 +70,6 @@ describe("OTP delivery hardening migration 008", () => {
     await migration.down(runner);
 
     const sql = queries.join("\n");
-    expect(migration.name).toBe("HardenOtpDeliveryOutbox202608280008");
     expect(sql).toContain('ALTER TABLE "otp_challenges" ADD "is_decoy"');
     expect(sql).toContain(
       'ALTER TABLE "otp_challenges" ALTER COLUMN "user_id" DROP NOT NULL',

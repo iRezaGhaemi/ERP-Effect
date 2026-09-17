@@ -58,6 +58,7 @@
     "typeorm": "^0.3.28"
   },
   "devDependencies": {
+    "@effect-erp/testing": "workspace:*",
     "@types/node": "^24.0.0"
   }
 }

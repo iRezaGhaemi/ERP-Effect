@@ -5,7 +5,7 @@ import { AuditQuerySchema, type AuditQuery } from "../contracts/index.js";
 import { AuditQueryService } from "./audit-query.service.js";
 
 const RequirePermission = (key: string): MethodDecorator =>
-  SetMetadata("effect:required-permission", key);
+  SetMetadata("effect:required-permission", [key]);
 
 @Controller("audit-logs")
 export class AuditController {

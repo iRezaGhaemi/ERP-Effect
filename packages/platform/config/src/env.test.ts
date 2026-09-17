@@ -8,21 +8,29 @@ const baseEnv = {
   DATABASE_URL: "postgres://effect:effect@localhost:5432/effect_erp",
   WEB_ORIGIN: "http://localhost:3000",
   INTERNAL_API_URL: "http://localhost:3001",
-  OTP_PEPPER: "o".repeat(32),
+  AUTH_RATE_LIMIT_SECRET: "r".repeat(32),
   JWT_ACCESS_SECRET: "j".repeat(32),
-  SMS_PROVIDER: "console",
-  INITIAL_ADMIN_PHONE: "09121234567",
-  OTP_DELIVERY_ACTIVATION_MARGIN_SECONDS: "5",
 };
 
 describe("parseEnv", () => {
-  it("rejects an unsafe production SMS provider", () => {
+  it("requires the distinct password-auth rate-limit secret without bootstrap or OTP inputs", () => {
+    const passwordEnv = {
+      NODE_ENV: "development",
+      API_PORT: "3001",
+      DATABASE_URL: "postgres://effect:effect@localhost:5432/effect_erp",
+      WEB_ORIGIN: "http://localhost:3000",
+      INTERNAL_API_URL: "http://localhost:3001",
+      JWT_ACCESS_SECRET: "j".repeat(32),
+      AUTH_RATE_LIMIT_SECRET: "r".repeat(32),
+    };
+
+    expect(parseEnv(passwordEnv).AUTH_RATE_LIMIT_SECRET).toBe("r".repeat(32));
     expect(() =>
-      parseEnv({ ...baseEnv, NODE_ENV: "production", SMS_PROVIDER: "console" }),
-    ).toThrow(/SMS_PROVIDER/);
+      parseEnv({ ...passwordEnv, AUTH_RATE_LIMIT_SECRET: "r".repeat(31) }),
+    ).toThrow(/AUTH_RATE_LIMIT_SECRET/);
   });
 
-  it.each(["OTP_PEPPER", "JWT_ACCESS_SECRET"] as const)(
+  it.each(["AUTH_RATE_LIMIT_SECRET", "JWT_ACCESS_SECRET"] as const)(
     "rejects a %s shorter than 32 characters",
     (key) => {
       expect(() => parseEnv({ ...baseEnv, [key]: "x".repeat(31) })).toThrow(
@@ -37,126 +45,11 @@ describe("parseEnv", () => {
     expect(() => parseEnv(withoutDatabaseUrl)).toThrow(/DATABASE_URL/);
   });
 
-  it.each(["console", "fake"] as const)(
-    "rejects the %s provider in production",
-    (SMS_PROVIDER) => {
-      expect(() =>
-        parseEnv({ ...baseEnv, NODE_ENV: "production", SMS_PROVIDER }),
-      ).toThrow(/SMS_PROVIDER/);
-    },
-  );
-
-  it("accepts the http provider in production when its credentials are configured", () => {
-    const env = parseEnv({
-      ...baseEnv,
-      NODE_ENV: "production",
-      SMS_PROVIDER: "http",
-      SMS_HTTP_URL: "https://sms.example.com/send",
-      SMS_HTTP_TOKEN: "sms-token",
-    });
-
-    expect(env.SMS_PROVIDER).toBe("http");
-  });
-
-  it("accepts empty optional HTTP settings for the console provider", () => {
-    const env = parseEnv({ ...baseEnv, SMS_HTTP_URL: "", SMS_HTTP_TOKEN: "" });
-
-    expect(env.SMS_HTTP_URL).toBeUndefined();
-    expect(env.SMS_HTTP_TOKEN).toBeUndefined();
-  });
-
-  it("validates the bounded OTP delivery activation margin", () => {
-    expect(
-      parseEnv({
-        ...baseEnv,
-        OTP_DELIVERY_ACTIVATION_MARGIN_SECONDS: "30",
-      }).OTP_DELIVERY_ACTIVATION_MARGIN_SECONDS,
-    ).toBe(30);
-    expect(() =>
-      parseEnv({
-        ...baseEnv,
-        OTP_DELIVERY_ACTIVATION_MARGIN_SECONDS: "0",
-      }),
-    ).toThrow(/OTP_DELIVERY_ACTIVATION_MARGIN_SECONDS/);
-    expect(() =>
-      parseEnv({
-        ...baseEnv,
-        OTP_DELIVERY_ACTIVATION_MARGIN_SECONDS: "31",
-      }),
-    ).toThrow(/OTP_DELIVERY_ACTIVATION_MARGIN_SECONDS/);
-  });
-
-  it("requires an explicit OTP delivery activation margin in production", () => {
-    const {
-      OTP_DELIVERY_ACTIVATION_MARGIN_SECONDS: _activationMargin,
-      ...withoutActivationMargin
-    } = baseEnv;
-
-    expect(() =>
-      parseEnv({
-        ...withoutActivationMargin,
-        NODE_ENV: "production",
-        SMS_PROVIDER: "http",
-        SMS_HTTP_URL: "https://sms.example.com/send",
-        SMS_HTTP_TOKEN: "sms-token",
-      }),
-    ).toThrow(/OTP_DELIVERY_ACTIVATION_MARGIN_SECONDS/);
-  });
-
-  it("rejects production OTP TTLs that cannot outlive delivery activation", () => {
-    expect(() =>
-      parseEnv({
-        ...baseEnv,
-        NODE_ENV: "production",
-        SMS_PROVIDER: "http",
-        SMS_HTTP_URL: "https://sms.example.com/send",
-        SMS_HTTP_TOKEN: "sms-token",
-        OTP_TTL_SECONDS: "10",
-        OTP_DELIVERY_ACTIVATION_MARGIN_SECONDS: "5",
-      }),
-    ).toThrow(/OTP_TTL_SECONDS/);
-  });
-
-  it("requires production OTP TTL to be strictly greater than delivery timeout plus activation margin", () => {
-    const productionHttpEnv = {
-      ...baseEnv,
-      NODE_ENV: "production",
-      SMS_PROVIDER: "http",
-      SMS_HTTP_URL: "https://sms.example.com/send",
-      SMS_HTTP_TOKEN: "sms-token",
-      OTP_DELIVERY_ACTIVATION_MARGIN_SECONDS: "30",
-    };
-
-    expect(() =>
-      parseEnv({ ...productionHttpEnv, OTP_TTL_SECONDS: "35" }),
-    ).toThrow(/OTP_TTL_SECONDS/);
-    expect(
-      parseEnv({ ...productionHttpEnv, OTP_TTL_SECONDS: "36" }).OTP_TTL_SECONDS,
-    ).toBe(36);
-  });
-
-  it("accepts production OTP TTLs at the documented delivery boundary", () => {
-    const env = parseEnv({
-      ...baseEnv,
-      NODE_ENV: "production",
-      SMS_PROVIDER: "http",
-      SMS_HTTP_URL: "https://sms.example.com/send",
-      SMS_HTTP_TOKEN: "sms-token",
-      OTP_TTL_SECONDS: "30",
-      OTP_DELIVERY_ACTIVATION_MARGIN_SECONDS: "24",
-    });
-
-    expect(env.OTP_TTL_SECONDS).toBe(30);
-  });
-
   it("rejects production configuration that disables secure cookies", () => {
     expect(() =>
       parseEnv({
         ...baseEnv,
         NODE_ENV: "production",
-        SMS_PROVIDER: "http",
-        SMS_HTTP_URL: "https://sms.example.com/send",
-        SMS_HTTP_TOKEN: "sms-token",
         COOKIE_SECURE: "false",
       }),
     ).toThrow(/COOKIE_SECURE/);

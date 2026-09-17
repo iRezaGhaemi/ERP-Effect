@@ -9,4 +9,5 @@ export { PermissionGuard } from "./permission.guard.js";
 export {
   PERMISSION_METADATA_KEY,
   RequirePermission,
+  RequirePermissions,
 } from "./require-permission.decorator.js";

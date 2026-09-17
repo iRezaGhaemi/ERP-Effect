@@ -1,7 +1,7 @@
 import { ApiError, ErrorEnvelopeSchema, OkResponseSchema, UuidIdParamsSchema } from "@effect-erp/contracts";
 import { z } from "zod";
 
-import { CreateUserSchema, UpdateUserSchema, UserDetailDtoSchema, UserDtoSchema, UserPageQuerySchema, UserPageSchema, type CreateUserInput, type UpdateUserInput, type UserPageQuery } from "../contracts/index.js";
+import { CreatePasswordUserSchema, UpdateUserSchema, UserDetailDtoSchema, UserDtoSchema, UserPageQuerySchema, UserPageSchema, type CreatePasswordUserInput, type UpdateUserInput, type UserPageQuery } from "../contracts/index.js";
 
 function csrfToken(): string | undefined {
   return document.cookie.split(";").map((part) => part.trim()).find((part) => part.startsWith("effect_csrf="))?.slice("effect_csrf=".length);
@@ -34,7 +34,7 @@ export class UsersClient {
     return this.request(`/users?page=${parsed.page}&pageSize=${parsed.pageSize}`, UserPageSchema);
   }
   get(id: string) { return this.request(`/users/${UuidIdParamsSchema.parse({ id }).id}`, UserDetailDtoSchema); }
-  create(input: CreateUserInput) { return this.request("/users", UserDtoSchema, { method: "POST", body: CreateUserSchema.parse(input), csrf: true }); }
+  create(input: CreatePasswordUserInput) { return this.request("/users", UserDtoSchema, { method: "POST", body: CreatePasswordUserSchema.parse(input), csrf: true }); }
   update(id: string, input: UpdateUserInput) { return this.request(`/users/${UuidIdParamsSchema.parse({ id }).id}`, UserDtoSchema, { method: "PATCH", body: UpdateUserSchema.parse(input), csrf: true }); }
   suspend(id: string) { return this.request(`/users/${UuidIdParamsSchema.parse({ id }).id}/suspend`, OkResponseSchema, { method: "POST", csrf: true }).then(() => undefined); }
   activate(id: string) { return this.request(`/users/${UuidIdParamsSchema.parse({ id }).id}/activate`, OkResponseSchema, { method: "POST", csrf: true }).then(() => undefined); }

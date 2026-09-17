@@ -34,6 +34,7 @@ import { CreateAuditLogs202608280002 } from "../../../packages/platform/database
 import { ReconcileAuditLogsActorNull202608280003 } from "../../../packages/platform/database/src/migrations/202608280003-reconcile-audit-logs-actor-null.js";
 import { HardenAuditLogBoundary202608280004 } from "../../../packages/platform/database/src/migrations/202608280004-harden-audit-log-boundary.js";
 import { CreateAccessControl202608280005 } from "../../../packages/platform/database/src/migrations/202608280005-create-access-control.js";
+import { AddPasswordCredentials202609010010 } from "../../../packages/platform/database/src/migrations/202609010010-add-password-credentials.js";
 
 class TestingPermissionGuard extends PermissionGuard implements CanActivate {
   override async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -48,6 +49,8 @@ class TestingPermissionGuard extends PermissionGuard implements CanActivate {
         sessionId: "00000000-0000-4000-8000-000000000001",
         phone: "+989000000000",
         permissions: [],
+        credentialVersion: 0,
+        mustChangePassword: false,
       };
     return super.canActivate(context);
   }
@@ -88,6 +91,7 @@ describe("access-control API", () => {
           ReconcileAuditLogsActorNull202608280003,
           HardenAuditLogBoundary202608280004,
           CreateAccessControl202608280005,
+          AddPasswordCredentials202609010010,
         ],
         synchronize: false,
       });
@@ -116,7 +120,10 @@ describe("access-control API", () => {
       });
       sources.push(runtime);
       await runtime.initialize();
-      await seedInitialAccess(runtime, "09121234567");
+      await seedInitialAccess(runtime, "09121234567", {
+        username: "access.e2e.admin",
+        password: "Access e2e bootstrap phrase 123!",
+      });
       const [{ id: adminId }] = await runtime.query<Array<{ id: string }>>(
         `SELECT id FROM users WHERE phone = '+989121234567'`,
       );
@@ -199,7 +206,13 @@ describe("access-control API", () => {
         .set("Cookie", csrfCookie)
         .set("Origin", webOrigin)
         .set("x-csrf-token", csrfToken)
-        .send({ phone: "09123334444", firstName: "کاربر", lastName: "محدود" })
+        .send({
+          phone: "09123334444",
+          firstName: "کاربر",
+          lastName: "محدود",
+          username: "limited.user",
+          initialPassword: "Limited user phrase 123!",
+        })
         .expect(201);
       expect(() => UserDtoSchema.parse(created.body)).not.toThrow();
       const detail = await request(app.getHttpServer())

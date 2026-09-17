@@ -21,11 +21,11 @@ it("TypeORM accepts every registered migration and preserves its execution order
     getMigrations(): Migration[];
   };
   const migrations = executor.getMigrations();
-  expect(migrations).toHaveLength(9);
+  expect(migrations).toHaveLength(11);
   expect(migrations.map(({ name }) => name)).toEqual(
     source.migrations.map(({ name }) => name),
   );
-  expect(new Set(migrations.map(({ timestamp }) => timestamp)).size).toBe(9);
+  expect(new Set(migrations.map(({ timestamp }) => timestamp)).size).toBe(11);
   expect(
     migrations.every(({ timestamp }) => timestamp >= Date.UTC(2026, 7, 28)),
   ).toBe(true);

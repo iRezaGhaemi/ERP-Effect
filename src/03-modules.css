@@ -312,9 +312,12 @@
   .pg-head{flex-direction:column;align-items:stretch}
   .pg-actions{width:100%}
   .pg-actions .btn{flex:1}
-  .otp-box{width:40px;height:48px;font-size:19px}
   .msn-grid{gap:8px}
 }
+
+.auth-demo-note{display:flex;align-items:flex-start;gap:8px;margin-bottom:16px;padding:10px 12px;border:1px solid var(--warn);border-radius:var(--r-md);background:var(--warn-soft);color:var(--t2);font-size:12px;line-height:1.8}
+.auth-demo-note svg{flex:none;margin-top:4px;color:var(--warn)}
+.auth-demo-note code{direction:ltr;unicode-bidi:isolate;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--t1);font-size:11px}
 
 /* ---------- responsive split grids (collapse on small screens) ---------- */
 .grid-split{grid-template-columns:minmax(0,2fr) minmax(0,1fr)}
