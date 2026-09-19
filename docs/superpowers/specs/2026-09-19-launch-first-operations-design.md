@@ -2,7 +2,7 @@
 
 تاریخ: ۱۴۰۵/۰۶/۲۸ (2026-09-19)
 
-وضعیت: طراحی گفت‌وگویی تأیید شده؛ در انتظار بازبینی سند
+وضعیت: تأییدشده توسط کاربر برای برنامه‌ریزی اجرا
 
 شاخهٔ تحویل: `codex/foundation-identity`
 
@@ -262,7 +262,7 @@ GET    /dashboard/summary
 - `search` حداکثر 120 نویسه؛
 - sort فقط از allowlist هر endpoint؛
 - فیلترها با enum یا UUID معتبر؛
-- پاسخ شامل `items`, `page`, `pageSize`, `total` است.
+- پاسخ شامل `items` و `meta` است؛ `meta` فیلدهای `page`, `pageSize`, `total`, `pageCount` را مطابق قرارداد pagination موجود محصول دارد.
 
 mutationهای موجودیت mutable باید `version` مورد انتظار را ارسال کنند. اختلاف نسخه پاسخ `409 CONCURRENT_UPDATE` می‌دهد. شناسهٔ ناشناخته `404`، ورودی نامعتبر `400`، نبود session برابر `401` و نبود permission برابر `403` است.
 
