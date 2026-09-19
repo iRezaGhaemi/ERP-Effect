@@ -1,0 +1,52 @@
+{
+  "name": "@effect/projects",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "files": ["dist"],
+  "exports": {
+    "./contracts": {
+      "types": "./dist/contracts/index.d.ts",
+      "default": "./dist/contracts/index.js"
+    },
+    "./entities": {
+      "types": "./dist/entities/index.d.ts",
+      "default": "./dist/entities/index.js"
+    },
+    "./server": {
+      "types": "./dist/server/index.d.ts",
+      "default": "./dist/server/index.js"
+    },
+    "./web": {
+      "types": "./dist/web/index.d.ts",
+      "default": "./dist/web/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "pnpm run build",
+    "test": "vitest run --config vitest.config.ts",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
+  },
+  "dependencies": {
+    "@effect/access-control": "workspace:*",
+    "@effect/audit": "workspace:*",
+    "@effect-erp/contracts": "workspace:*",
+    "@effect/ui": "workspace:*",
+    "@effect/users": "workspace:*",
+    "@nestjs/common": "^11.1.17",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "typeorm": "^0.3.28",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@effect-erp/testing": "workspace:*",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "jsdom": "^24.1.3"
+  }
+}
